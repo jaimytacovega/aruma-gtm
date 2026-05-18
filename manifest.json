@@ -1,0 +1,27 @@
+{
+  "vendor": "aruma",
+  "name": "aruma-gtm",
+  "version": "0.3.0",
+  "title": "Aruma GTM",
+  "description": "Custom Google Tag Manager dataLayer events for the Aruma storefront",
+  "builders": {
+    "react": "3.x",
+    "store": "0.x",
+    "pixel": "0.x"
+  },
+  "dependencies": {
+    "vtex.pixel-interfaces": "1.x"
+  },
+  "settingsSchema": {
+    "title": "Aruma GTM",
+    "type": "object",
+    "properties": {
+      "gtmId": {
+        "title": "GTM container ID (optional)",
+        "description": "Example: GTM-XXXX. Leave empty if vtex.google-tag-manager already loads your container.",
+        "type": "string"
+      }
+    }
+  },
+  "$schema": "https://raw.githubusercontent.com/vtex/node-vtex-api/master/gen/manifest.schema"
+}

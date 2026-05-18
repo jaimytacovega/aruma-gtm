@@ -1,0 +1,26 @@
+<script>
+  (function () {
+    window.dataLayer = window.dataLayer || []
+
+    var gtmId = '{{settings.gtmId}}'
+
+    if (!gtmId) {
+      return
+    }
+
+    if (document.querySelector('script[src*="googletagmanager.com/gtm.js?id=' + gtmId + '"]')) {
+      return
+    }
+
+    window.dataLayer.push({
+      'gtm.start': new Date().getTime(),
+      event: 'gtm.js',
+    })
+
+    var script = document.createElement('script')
+    script.async = true
+    script.src =
+      'https://www.googletagmanager.com/gtm.js?id=' + gtmId
+    document.head.appendChild(script)
+  })()
+</script>
