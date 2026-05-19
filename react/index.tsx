@@ -13,6 +13,7 @@ import { homeHeaderGeneralOptions } from './events/2_1_1__homeHeaderGeneralOptio
 import { homeHeaderMenu } from './events/2_1_2__homeHeaderMenu'
 import { footerFunctionalOptions } from './events/2_2_1__footerFunctionalOptions'
 import { footerSocials } from './events/2_2_2__footerSocials'
+import { registerLoginModal } from './events/2_3_1_1__registerLoginModal'
 
 
 let domClickListenerAttached = false
@@ -65,6 +66,7 @@ export const handleEvents = (e: PixelMessage) => {
             // Re-run after each route change (VTEX SPA). Delegation on document is enough,
             // but pageView is the right hook if you add per-page DOM setup later.
             setupDomClickListeners()
+            registerLoginModal()
 
             break
         }
@@ -105,4 +107,7 @@ export const handleEvents = (e: PixelMessage) => {
 if (canUseDOM) {
     window.addEventListener('message', handleEvents)
     setupDomClickListeners()
+
+    // 2.3.1.1 Register Login Modal
+    registerLoginModal()
 }
