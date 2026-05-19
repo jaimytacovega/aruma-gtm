@@ -15,6 +15,7 @@ import { footerFunctionalOptions } from './events/2_2_1__footerFunctionalOptions
 import { footerSocials } from './events/2_2_2__footerSocials'
 import { registerLoginModal } from './events/2_3_1_1__registerLoginModal'
 import { registerRecoverPassword } from './events/2_3_1_2__registerRecoverPassword'
+import { registerPickButtons } from './events/2_3_1_3__registerPickButtons'
 
 
 let domClickListenerAttached = false
@@ -27,9 +28,7 @@ const handleDocumentClick = (event: MouseEvent) => {
     }
 
     // 2.1.1 Home Header General Options
-    homeHeaderGeneralOptions(target, 'header-magenta-button ')
-    homeHeaderGeneralOptions(target, 'header-login ')
-    homeHeaderGeneralOptions(target, 'storesaruma ')
+    homeHeaderGeneralOptions(target)
 
     // 2.1.2 Home Header Menu
     homeHeaderMenu(target)
@@ -44,6 +43,9 @@ const handleDocumentClick = (event: MouseEvent) => {
 
     // 2.3.1.2 Recover password (login modal)
     registerRecoverPassword(target)
+
+    // 2.3.1.3 Login modal buttons (Ingresar / Crear cuenta)
+    registerPickButtons(target)
 }
 
 /** VTEX has no pixel event for arbitrary DOM clicks — use delegation on document. */
