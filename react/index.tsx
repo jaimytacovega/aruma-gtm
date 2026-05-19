@@ -14,6 +14,7 @@ import { homeHeaderMenu } from './events/2_1_2__homeHeaderMenu'
 import { footerFunctionalOptions } from './events/2_2_1__footerFunctionalOptions'
 import { footerSocials } from './events/2_2_2__footerSocials'
 import { registerLoginModal } from './events/2_3_1_1__registerLoginModal'
+import { registerRecoverPassword } from './events/2_3_1_2__registerRecoverPassword'
 
 
 let domClickListenerAttached = false
@@ -40,6 +41,9 @@ const handleDocumentClick = (event: MouseEvent) => {
 
     // 2.2.2 Footer Socials
     footerSocials(target)
+
+    // 2.3.1.2 Recover password (login modal)
+    registerRecoverPassword(target)
 }
 
 /** VTEX has no pixel event for arbitrary DOM clicks — use delegation on document. */
