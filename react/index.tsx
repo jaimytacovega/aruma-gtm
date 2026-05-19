@@ -10,6 +10,7 @@ import type {
 import { pushToDataLayer } from './utils'
 
 import { homeHeaderGeneralOptions } from './events/2_1_1__homeHeaderGeneralOptions'
+import { homeHeaderMenu } from './events/2_1_2__homeHeaderMenu'
 
 
 let domClickListenerAttached = false
@@ -21,9 +22,13 @@ function handleDocumentClick(event: MouseEvent) {
         return
     }
 
+    // 2.1.1 Home Header General Options
     homeHeaderGeneralOptions(target, 'header-magenta-button ')
     homeHeaderGeneralOptions(target, 'header-login ')
     homeHeaderGeneralOptions(target, 'storesaruma ')
+
+    // 2.1.2 Home Header Menu
+    homeHeaderMenu(target)
 }
 
 /** VTEX has no pixel event for arbitrary DOM clicks — use delegation on document. */
