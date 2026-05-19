@@ -17,7 +17,7 @@ import { footerSocials } from './events/2_2_2__footerSocials'
 
 let domClickListenerAttached = false
 
-function handleDocumentClick(event: MouseEvent) {
+const handleDocumentClick = (event: MouseEvent) => {
     const target = event.target
 
     if (!(target instanceof Element)) {
@@ -42,7 +42,7 @@ function handleDocumentClick(event: MouseEvent) {
 }
 
 /** VTEX has no pixel event for arbitrary DOM clicks — use delegation on document. */
-function setupDomClickListeners() {
+const setupDomClickListeners = () => {
     if (!canUseDOM || domClickListenerAttached) {
         return
     }
@@ -51,7 +51,7 @@ function setupDomClickListeners() {
     domClickListenerAttached = true
 }
 
-export function handleEvents(e: PixelMessage) {
+export const handleEvents = (e: PixelMessage) => {
     switch (e.data.eventName) {
         case 'vtex:pageView': {
             const data = e.data as PageViewData

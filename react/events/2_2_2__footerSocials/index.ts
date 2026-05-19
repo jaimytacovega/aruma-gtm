@@ -11,7 +11,7 @@ const SOCIAL_NETWORKS: Array<{ pattern: RegExp; name: string }> = [
   { pattern: /facebook/i, name: 'Facebook' },
 ]
 
-function getSocialNetworkName(anchor: HTMLAnchorElement): string {
+const getSocialNetworkName = (anchor: HTMLAnchorElement): string => {
   const sources = [
     anchor.href,
     anchor.querySelector('img')?.src ?? '',

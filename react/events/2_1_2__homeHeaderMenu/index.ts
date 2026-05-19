@@ -3,7 +3,7 @@ import { pushToDataLayer } from '../../utils'
 const MENU_NAV_SELECTOR = '[class*="menuContainerNav--sticky-header-menu"]'
 const MENU_ITEM_SELECTOR = 'a, span[class*="styledLink"]'
 
-function getMenuItemCta(element: HTMLElement): string {
+const getMenuItemCta = (element: HTMLElement): string => {
   return (
     element
       .querySelector('[class*="styledLinkContent"]')

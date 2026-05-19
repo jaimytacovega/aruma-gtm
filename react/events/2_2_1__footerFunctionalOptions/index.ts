@@ -1,17 +1,15 @@
 import { pushToDataLayer } from '../../utils'
 
-/** Desktop footer columns, mobile accordion, libro de reclamaciones image row */
 const FOOTER_SCOPE_SELECTOR = [
   '[class*="flexCol--links-footer"]',
   '[class*="flexCol--menu-mobile"]',
   '[class*="footer-option-pay-2"]',
 ].join(', ')
 
-/** Anchors + mobile accordion section headers (e.g. Aruma, Servicio al cliente) */
 const FOOTER_CLICKABLE_SELECTOR =
   'a, span[class*="styledLink--footer-menu-title"]'
 
-function getStyledLinkCta(element: HTMLElement): string {
+const getStyledLinkCta = (element: HTMLElement): string => {
   const content = element.querySelector('[class*="styledLinkContent"]')
 
   if (content instanceof HTMLElement) {
@@ -29,7 +27,7 @@ function getStyledLinkCta(element: HTMLElement): string {
   return element.textContent?.replace(/\s+/g, ' ').trim() || ''
 }
 
-function isLibroReclamacionesLink(anchor: HTMLAnchorElement): boolean {
+const isLibroReclamacionesLink = (anchor: HTMLAnchorElement): boolean => {
   if (
     anchor.className.includes('libro-de-reclamos') ||
     anchor.className.includes('imagen-reclamaciones')
@@ -45,7 +43,7 @@ function isLibroReclamacionesLink(anchor: HTMLAnchorElement): boolean {
   )
 }
 
-function getAnchorCta(anchor: HTMLAnchorElement): string {
+const getAnchorCta = (anchor: HTMLAnchorElement): string => {
   if (isLibroReclamacionesLink(anchor)) {
     return 'Libro de reclamaciones'
   }

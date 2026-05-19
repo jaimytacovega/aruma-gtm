@@ -2,7 +2,7 @@ import { canUseDOM } from 'vtex.render-runtime'
 
 const log = (...args: unknown[]) => console.info('[aruma-gtm]', ...args)
 
-function pushToDataLayer(payload: Record<string, unknown>) {
+const pushToDataLayer = (payload: Record<string, unknown>) => {
     if (!canUseDOM) {
         return
     }
