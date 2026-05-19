@@ -12,6 +12,7 @@ import { pushToDataLayer } from './utils'
 import { homeHeaderGeneralOptions } from './events/2_1_1__homeHeaderGeneralOptions'
 import { homeHeaderMenu } from './events/2_1_2__homeHeaderMenu'
 import { footerFunctionalOptions } from './events/2_2_1__footerFunctionalOptions'
+import { footerSocials } from './events/2_2_2__footerSocials'
 
 
 let domClickListenerAttached = false
@@ -35,6 +36,9 @@ function handleDocumentClick(event: MouseEvent) {
     
     // 2.2.1 Footer Functional Options
     footerFunctionalOptions(target)
+
+    // 2.2.2 Footer Socials
+    footerSocials(target)
 }
 
 /** VTEX has no pixel event for arbitrary DOM clicks — use delegation on document. */
