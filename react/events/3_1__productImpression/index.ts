@@ -2,6 +2,14 @@ import { canUseDOM } from 'vtex.render-runtime'
 
 import { log } from '../../utils'
 
+import {
+  buildViewItem,
+  buildViewItemListPayload,
+  clearCatalogCache,
+  fetchCatalogProduct,
+  prefetchCatalogProduct,
+} from './catalog'
+
 const DESKTOP_VISIBILITY_THRESHOLD = 0.25
 const MOBILE_VISIBILITY_THRESHOLD = 0.75
 const MOBILE_MAX_WIDTH = 768
@@ -262,7 +270,7 @@ const scheduleBatchFlush = () => {
 
   batchFlushTimer = window.setTimeout(() => {
     batchFlushTimer = null
-    flushPendingBatches()
+    void flushPendingBatches()
   }, BATCH_DEBOUNCE_MS)
 }
 
@@ -276,7 +284,7 @@ const isAlreadyPending = (key: string): boolean => {
   return false
 }
 
-const flushPendingBatches = () => {
+const flushPendingBatches = async () => {
   if (pendingByList.size === 0) {
     return
   }
@@ -284,7 +292,7 @@ const flushPendingBatches = () => {
   let hasRemainingPending = false
 
   for (const [listId, entries] of pendingByList.entries()) {
-    const ready: VisibleProduct[] = []
+    const ready: PendingEntry[] = []
     const stillPending: PendingEntry[] = []
 
     for (const entry of entries) {
@@ -293,7 +301,7 @@ const flushPendingBatches = () => {
       }
 
       if (isProductVisible(entry.el)) {
-        ready.push(entry.product)
+        ready.push(entry)
         loggedProductKeys.add(getLogKey(entry.product))
       } else {
         stillPending.push(entry)
@@ -301,17 +309,29 @@ const flushPendingBatches = () => {
     }
 
     if (ready.length > 0) {
-      const sorted = [...ready].sort((a, b) => a.index - b.index)
+      const sorted = [...ready].sort(
+        (a, b) => a.product.index - b.product.index
+      )
+
+      const items = await Promise.all(
+        sorted.map(async (entry) => {
+          const catalog = await fetchCatalogProduct(entry.product.slug)
+
+          return buildViewItem(entry.product, catalog)
+        })
+      )
+
+      const { listName } = sorted[0].product
 
       batchLogCount += 1
 
-      log('products seen', {
+      const payload = buildViewItemListPayload(items, listId, listName)
+
+      log('view_item_list', {
         batch: batchLogCount,
-        listId,
-        listName: sorted[0].listName,
-        count: sorted.length,
         viewport: isMobileViewport() ? 'mobile' : 'desktop',
-        products: sorted,
+        source: 'vtex-catalog-api+dom',
+        ...payload,
       })
     }
 
@@ -346,6 +366,8 @@ const queueVisibleProduct = (productEl: HTMLElement) => {
   }
 
   const batch = pendingByList.get(product.listId) ?? []
+
+  prefetchCatalogProduct(product.slug)
 
   batch.push({ product, el: productEl })
   pendingByList.set(product.listId, batch)
@@ -404,7 +426,7 @@ const disconnectProductImpression = () => {
     batchFlushTimer = null
   }
 
-  flushPendingBatches()
+  void flushPendingBatches()
 
   intersectionObserver?.disconnect()
   domObserver?.disconnect()
@@ -413,6 +435,7 @@ const disconnectProductImpression = () => {
   observedProducts.clear()
   loggedProductKeys.clear()
   pendingByList.clear()
+  clearCatalogCache()
   trackingActive = false
   batchLogCount = 0
 }
