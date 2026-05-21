@@ -1,11 +1,6 @@
 import { canUseDOM } from 'vtex.render-runtime'
 
-import type {
-    AddToCartData,
-    PageViewData,
-    PixelMessage,
-    ProductViewData,
-} from './typings/events'
+import type { PageViewData, PixelMessage } from './typings/events'
 
 import { pushToDataLayer } from './utils'
 
@@ -16,7 +11,7 @@ import { footerSocials } from './events/2_2_2__footerSocials'
 import { registerLoginModal } from './events/2_3_1_1__registerLoginModal'
 import { registerRecoverPassword } from './events/2_3_1_2__registerRecoverPassword'
 import { registerPickButtons } from './events/2_3_1_3__registerPickButtons'
-
+import { registerProductImpression } from './events/3_1__productImpression'
 
 let domClickListenerAttached = false
 
@@ -74,35 +69,38 @@ export const handleEvents = (e: PixelMessage) => {
             setupDomClickListeners()
             registerLoginModal()
 
-            break
-        }
-
-        case 'vtex:productView': {
-            const data = e.data as ProductViewData
-
-            pushToDataLayer({
-                event: 'view_item',
-                productId: data.product?.productId,
-                productName: data.product?.productName,
-                brand: data.product?.brand,
-                categoryId: data.product?.categoryId,
-                categories: data.product?.categories,
-                skuId: data.product?.selectedSku?.itemId,
-            })
+            // After analytics_loaded — avoid product seen before page context on first paint
+            registerProductImpression()
 
             break
         }
 
-        case 'vtex:addToCart': {
-            const data = e.data as AddToCartData
+        // case 'vtex:productView': {
+        //     const data = e.data as ProductViewData
 
-            pushToDataLayer({
-                event: 'add_to_cart',
-                items: data.items,
-            })
+        //     pushToDataLayer({
+        //         event: 'view_item',
+        //         productId: data.product?.productId,
+        //         productName: data.product?.productName,
+        //         brand: data.product?.brand,
+        //         categoryId: data.product?.categoryId,
+        //         categories: data.product?.categories,
+        //         skuId: data.product?.selectedSku?.itemId,
+        //     })
 
-            break
-        }
+        //     break
+        // }
+
+        // case 'vtex:addToCart': {
+        //     const data = e.data as AddToCartData
+
+        //     pushToDataLayer({
+        //         event: 'add_to_cart',
+        //         items: data.items,
+        //     })
+
+        //     break
+        // }
 
         default: {
             break
