@@ -1,6 +1,7 @@
 import { canUseDOM } from 'vtex.render-runtime'
 
 const log = (...args: unknown[]) => console.info('[aruma-gtm]', ...args)
+const NOT_AVAILABLE = '(not available)'
 
 /** Modal actions only — emailAndPasswordForm wraps the whole login app incl. header trigger. */
 const LOGIN_MODAL_INTERACTION_SELECTOR = [
@@ -25,4 +26,5 @@ export {
     pushToDataLayer,
     log,
     isInsideLoginModalInteraction,
+    NOT_AVAILABLE,
 }

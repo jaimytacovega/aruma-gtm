@@ -1,3 +1,5 @@
+import { log, NOT_AVAILABLE } from '../../utils'
+
 const LOCATION_ID = 'Aruma'
 
 type CatalogOffer = {
@@ -140,6 +142,7 @@ const NOT_VEGANO_VALUE = 'No es vegano'
 
 const readVegano = (product: CatalogProduct | null): string => {
   const raw = readSpecification(product, ...VEGANO_SPEC_NAMES).trim()
+  // log('product', product)
 
   if (!raw) {
     return ''
@@ -191,6 +194,7 @@ export const fetchCatalogProduct = async (
       }
 
       const data = (await response.json()) as CatalogProduct[]
+      // log('catalog data', data)
 
       return Array.isArray(data) ? data[0] ?? null : null
     } catch {
@@ -223,30 +227,30 @@ export const buildViewItem = (
     affiliation:
       readSpecification(catalog, 'Tipo de producto', 'Tipo de Producto') ||
       categoryParts[0] ||
-      '',
-    coupon: '',
+      NOT_AVAILABLE,
+    coupon: NOT_AVAILABLE,
     discount,
     index: visible.index,
     item_brand: catalog?.brand ?? visible.brand,
     item_category:
-      readSpecification(catalog, 'Modo de uso', 'Modo de Uso') ||
+      readSpecification(catalog, 'USO', 'Modo de uso', 'Modo de Uso') ||
       categoryParts[0] ||
-      '',
+      NOT_AVAILABLE,
     item_category2:
-      readSpecification(catalog, 'Ingredientes') || categoryParts[1] || '',
+      readSpecification(catalog, 'INGREDIENTES') || categoryParts[1] || NOT_AVAILABLE,
     item_category3:
-      readSpecification(catalog, 'Textura/Acabado', 'Textura', 'Acabado') ||
+      readSpecification(catalog, 'TIPO DE PRODUCTO', 'Textura/Acabado', 'Textura', 'Acabado') ||
       categoryParts[2] ||
-      '',
+      NOT_AVAILABLE,
     item_category4:
-      readSpecification(catalog, 'Contenido') || categoryParts[3] || '',
+      readSpecification(catalog, 'CONTENIDO', 'Contenido') || categoryParts[3] || NOT_AVAILABLE,
     item_category5:
       readSpecification(
         catalog,
         'Tipo piel/cabello',
         'Tipo piel',
         'Tipo cabello'
-      ) || categoryParts[4] || '',
+      ) || categoryParts[4] || NOT_AVAILABLE,
     item_list_id: visible.listId,
     item_list_name: visible.listName,
     item_variant:
@@ -255,21 +259,22 @@ export const buildViewItem = (
         'Necesidad/A prueba de agua',
         'Necesidad',
         'A prueba de agua'
-      ) || skuName,
+      ) || skuName || NOT_AVAILABLE,
     location_id: LOCATION_ID,
-    vegano: readVegano(catalog),
+    vegano: readVegano(catalog) || NOT_AVAILABLE,
     crueltyFree: readSpecification(
       catalog,
       'Cruelty free',
       'Cruelty Free',
       'Cruelty-free'
-    ),
+    ) || NOT_AVAILABLE,
     frecuency: readSpecification(
       catalog,
+      'FRECUENCIA DE USO',
       'Frecuencia de uso',
       'Frecuencia',
       'Frecuency'
-    ),
+    ) || NOT_AVAILABLE,
     price: sellingPrice,
     magentaPoints_price: 0,
     quantity: 1,

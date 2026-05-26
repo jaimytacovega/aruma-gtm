@@ -1,6 +1,6 @@
 import { canUseDOM } from 'vtex.render-runtime'
 
-import { log } from '../../utils'
+import { pushToDataLayer, log } from '../../utils'
 
 import {
   buildViewItem,
@@ -9,6 +9,7 @@ import {
   fetchCatalogProduct,
   prefetchCatalogProduct,
 } from './catalog'
+
 
 const DESKTOP_VISIBILITY_THRESHOLD = 0.25
 const MOBILE_VISIBILITY_THRESHOLD = 0.75
@@ -327,12 +328,8 @@ const flushPendingBatches = async () => {
 
       const payload = buildViewItemListPayload(items, listId, listName)
 
-      log('view_item_list', {
-        batch: batchLogCount,
-        viewport: isMobileViewport() ? 'mobile' : 'desktop',
-        source: 'vtex-catalog-api+dom',
-        ...payload,
-      })
+      // log('payload', payload)
+      pushToDataLayer(payload)
     }
 
     if (stillPending.length > 0) {
