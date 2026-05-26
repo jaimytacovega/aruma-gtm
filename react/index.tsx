@@ -69,27 +69,12 @@ export const handleEvents = (e: PixelMessage) => {
             setupDomClickListeners()
             registerLoginModal()
 
+            // TODO: 3.1 Product Impression - Validate fields
             // After analytics_loaded — avoid product seen before page context on first paint
             registerProductImpression()
 
             break
         }
-
-        // case 'vtex:productView': {
-        //     const data = e.data as ProductViewData
-
-        //     pushToDataLayer({
-        //         event: 'view_item',
-        //         productId: data.product?.productId,
-        //         productName: data.product?.productName,
-        //         brand: data.product?.brand,
-        //         categoryId: data.product?.categoryId,
-        //         categories: data.product?.categories,
-        //         skuId: data.product?.selectedSku?.itemId,
-        //     })
-
-        //     break
-        // }
 
         // case 'vtex:addToCart': {
         //     const data = e.data as AddToCartData
