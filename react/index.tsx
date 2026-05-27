@@ -1,8 +1,8 @@
 import { canUseDOM } from 'vtex.render-runtime'
 
-import type { PageViewData, PixelMessage } from './typings/events'
+import type { PageViewData, PixelMessage, ProductClickData } from './typings/events'
 
-import { pushToDataLayer } from './utils'
+import { pushToDataLayer, log } from './utils'
 
 import { homeHeaderGeneralOptions } from './events/2_1_1__homeHeaderGeneralOptions'
 import { homeHeaderMenu } from './events/2_1_2__homeHeaderMenu'
@@ -12,6 +12,8 @@ import { registerLoginModal } from './events/2_3_1_1__registerLoginModal'
 import { registerRecoverPassword } from './events/2_3_1_2__registerRecoverPassword'
 import { registerPickButtons } from './events/2_3_1_3__registerPickButtons'
 import { registerProductImpression } from './events/3_1__productImpression'
+import { fetchCatalogProduct } from './events/3_1__productImpression/catalog'
+import { productClick } from './events/3_2__productClick'
 
 let domClickListenerAttached = false
 
@@ -73,6 +75,26 @@ export const handleEvents = (e: PixelMessage) => {
             // After analytics_loaded — avoid product seen before page context on first paint
             registerProductImpression()
 
+            break
+        }
+
+        case 'vtex:productClick': {
+            const data = e.data as ProductClickData
+
+            log('vtex:productClick', data)
+            log('vtex:productClick linkText', data.product.linkText)
+
+            if (data.product.linkText) {
+                void fetchCatalogProduct(data.product.linkText)
+                    .then((catalog) => {
+                        log('vtex:productClick catalog', catalog)
+                    })
+                    .catch((error: unknown) => {
+                        log('vtex:productClick catalog error', error)
+                    })
+            }
+            
+            void productClick(data)
             break
         }
 

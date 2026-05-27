@@ -12,14 +12,16 @@ const LOGIN_MODAL_INTERACTION_SELECTOR = [
 const isInsideLoginModalInteraction = (target: Element): boolean =>
     Boolean(target.closest(LOGIN_MODAL_INTERACTION_SELECTOR))
 
-const pushToDataLayer = (payload: Record<string, unknown>) => {
+const pushToDataLayer = (payload: Record<string, unknown>, disableLog: boolean = false) => {
     if (!canUseDOM) {
         return
     }
 
     window.dataLayer = window.dataLayer || []
     window.dataLayer.push(payload)
-    log(JSON.stringify(payload))
+    if (!disableLog) {
+        log(JSON.stringify(payload))
+    }
 }
 
 export {

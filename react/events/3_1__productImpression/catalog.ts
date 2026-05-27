@@ -1,4 +1,4 @@
-import { log, NOT_AVAILABLE } from '../../utils'
+import { NOT_AVAILABLE, log } from '../../utils'
 
 const LOCATION_ID = 'Aruma'
 
@@ -64,6 +64,15 @@ export type ViewItemListPayload = {
   }
 }
 
+export type SelectItemPayload = {
+  event: 'select_item'
+  ecommerce: {
+    item_list_id: string
+    item_list_name: string
+    items: [ViewItem]
+  }
+}
+
 type VisibleSnapshot = {
   slug: string
   name: string
@@ -74,7 +83,7 @@ type VisibleSnapshot = {
   listName: string
 }
 
-const catalogCache = new Map<string, Promise<CatalogProduct | null>>()
+const catalogCache = new Map<string, Promise<CatalogProduct>>()
 export const clearCatalogCache = () => {
   catalogCache.clear()
 }
@@ -166,19 +175,22 @@ export const prefetchCatalogProduct = (slug: string): void => {
     return
   }
 
-  void fetchCatalogProduct(slug)
+  void fetchCatalogProduct(slug).catch((error: unknown) => {
+    log('catalog prefetch failed', error)
+  })
 }
 
 export const fetchCatalogProduct = async (
   slug: string
-): Promise<CatalogProduct | null> => {
+): Promise<CatalogProduct> => {
   if (!slug) {
-    return null
+    throw new Error('Catalog product fetch requires a non-empty slug.')
   }
 
   const cached = catalogCache.get(slug)
 
   if (cached) {
+    log('catalog cached', cached)
     return cached
   }
 
@@ -190,21 +202,42 @@ export const fetchCatalogProduct = async (
       )
 
       if (!response.ok) {
-        return null
+        throw new Error(
+          `Catalog request failed for "${slug}" with status ${response.status} ${response.statusText}.`
+        )
       }
 
       const data = (await response.json()) as CatalogProduct[]
-      // log('catalog data', data)
+      log('catalog data', data)
 
-      return Array.isArray(data) ? data[0] ?? null : null
-    } catch {
-      return null
+      if (!Array.isArray(data)) {
+        throw new Error(`Catalog response for "${slug}" was not an array.`)
+      }
+
+      const product = data[0]
+
+      if (!product) {
+        throw new Error(`Catalog response for "${slug}" returned no products.`)
+      }
+
+      return product
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error
+      }
+
+      throw new Error(`Catalog request failed for "${slug}" with an unknown error.`)
     }
   })()
 
   catalogCache.set(slug, request)
 
-  return request
+  try {
+    return await request
+  } catch (error) {
+    catalogCache.delete(slug)
+    throw error
+  }
 }
 
 export const buildViewItem = (
@@ -291,5 +324,14 @@ export const buildViewItemListPayload = (
     item_list_id,
     item_list_name,
     items,
+  },
+})
+
+export const buildSelectItemPayload = (item: ViewItem): SelectItemPayload => ({
+  event: 'select_item',
+  ecommerce: {
+    item_list_id: item.item_list_id,
+    item_list_name: item.item_list_name,
+    items: [item],
   },
 })
