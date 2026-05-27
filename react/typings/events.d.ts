@@ -17,6 +17,7 @@ export interface PixelMessage extends MessageEvent {
     | PromoViewData
     | PromotionClickData
     | NewsletterSubscriptionData
+    | AddToWishlistData
 }
 
 export interface EventData {
@@ -112,6 +113,23 @@ export interface CartChangedData extends EventData {
   items: CartItem[]
 }
 
+export interface AddToWishlistData extends EventData {
+  event: 'addToWishlist'
+  eventName: 'vtex:addToWishlist'
+  items: {
+    selectedItem: WishlistSelectedItem
+    product: ProductSummary
+  }
+  list: string
+}
+
+export interface WishlistSelectedItem {
+  itemId?: string
+  name?: string
+  referenceId?: { Key: string; Value: string }
+  sellers: Seller[]
+}
+
 export interface OrderPlacedData extends Order, EventData {
   event: 'orderPlaced'
   eventName: 'vtex:orderPlaced'
@@ -186,6 +204,8 @@ interface CartItem {
   imageUrl: string
   name: string
   price: number
+  priceIsInt?: boolean
+  sellingPrice?: number
   productId: string
   productRefId: string
   quantity: number

@@ -43,7 +43,7 @@ const productClick = async (data: ProductClickData) => {
   const payload = buildSelectItemPayload(item)
 
 //   log('payload', payload)
-  pushToDataLayer(payload)
+  pushToDataLayer(payload, true)
 }
 
 export { productClick }

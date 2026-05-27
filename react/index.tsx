@@ -1,6 +1,13 @@
 import { canUseDOM } from 'vtex.render-runtime'
 
-import type { PageViewData, PixelMessage, ProductClickData, ProductViewData } from './typings/events'
+import type {
+    AddToCartData,
+    AddToWishlistData,
+    PageViewData,
+    PixelMessage,
+    ProductClickData,
+    ProductViewData,
+} from './typings/events'
 
 import { pushToDataLayer, log } from './utils'
 
@@ -15,6 +22,8 @@ import { registerProductImpression } from './events/3_1__productImpression'
 import { fetchCatalogProduct } from './events/3_1__productImpression/catalog'
 import { productClick } from './events/3_2__productClick'
 import { productDetail } from './events/3_3__productDetail'
+import { addToWishlist } from './events/3_4__addToWishlist'
+import { addToCart } from './events/3_5__addToCart'
 
 let domClickListenerAttached = false
 
@@ -82,15 +91,15 @@ export const handleEvents = (e: PixelMessage) => {
         case 'vtex:productClick': {
             const data = e.data as ProductClickData
 
-            log('vtex:productClick', data)
-            log('vtex:productClick linkText', data.product.linkText)
+            // log('vtex:productClick', data)
+            // log('vtex:productClick linkText', data.product.linkText)
 
             if (data.product.linkText) {
                 void fetchCatalogProduct(data.product.linkText)
                     .then((catalog) => {
                         log('vtex:productClick catalog', catalog)
                     })
-                    .catch((error: unknown) => {
+                    .catch((error) => {
                         log('vtex:productClick catalog error', error)
                     })
             }
@@ -107,16 +116,20 @@ export const handleEvents = (e: PixelMessage) => {
             break
         }
 
-        // case 'vtex:addToCart': {
-        //     const data = e.data as AddToCartData
+        // TODO: 3.4 Add to Wishlist - Validate fields
+        // case 'vtex:addToWishlist': {
+        //     const data = e.data as AddToWishlistData
 
-        //     pushToDataLayer({
-        //         event: 'add_to_cart',
-        //         items: data.items,
-        //     })
-
+        //     addToWishlist(data)
         //     break
         // }
+
+        case 'vtex:addToCart': {
+            const data = e.data as AddToCartData
+
+            void addToCart(data)
+            break
+        }
 
         default: {
             break

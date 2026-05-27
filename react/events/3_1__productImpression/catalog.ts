@@ -74,6 +74,16 @@ export type ViewItemPayload = {
   }
 }
 
+export type AddToCartPayload = {
+  event: 'add_to_cart'
+  ecommerce: {
+    currency: string
+    value: number
+    magentaPoints_value: number
+    items: ViewItem[]
+  }
+}
+
 export type SelectItemPayload = {
   event: 'select_item'
   ecommerce: {
@@ -180,12 +190,20 @@ const readVegano = (product: CatalogProduct | null): string => {
   return ''
 }
 
+const normalizeCatalogSlug = (slug: string): string => {
+  if (slug.endsWith('/p')) {
+    return slug
+  }
+
+  return `${slug}/p`
+}
+
 export const prefetchCatalogProduct = (slug: string): void => {
   if (!slug) {
     return
   }
 
-  void fetchCatalogProduct(slug).catch((error: unknown) => {
+  void fetchCatalogProduct(slug).catch((error) => {
     log('catalog prefetch failed', error)
   })
 }
@@ -197,7 +215,8 @@ export const fetchCatalogProduct = async (
     throw new Error('Catalog product fetch requires a non-empty slug.')
   }
 
-  const cached = catalogCache.get(slug)
+  const catalogSlug = normalizeCatalogSlug(slug)
+  const cached = catalogCache.get(catalogSlug)
 
   if (cached) {
     log('catalog cached', cached)
@@ -206,14 +225,15 @@ export const fetchCatalogProduct = async (
 
   const request = (async () => {
     try {
+      log('slug', catalogSlug)
       const response = await fetch(
-        `/api/catalog_system/pub/products/search/${encodeURIComponent(slug)}`,
+        `/api/catalog_system/pub/products/search/${encodeURIComponent(catalogSlug)}`,
         { credentials: 'same-origin' }
       )
 
       if (!response.ok) {
         throw new Error(
-          `Catalog request failed for "${slug}" with status ${response.status} ${response.statusText}.`
+          `Catalog request failed for "${catalogSlug}" with status ${response.status} ${response.statusText}.`
         )
       }
 
@@ -221,13 +241,13 @@ export const fetchCatalogProduct = async (
       log('catalog data', data)
 
       if (!Array.isArray(data)) {
-        throw new Error(`Catalog response for "${slug}" was not an array.`)
+        throw new Error(`Catalog response for "${catalogSlug}" was not an array.`)
       }
 
       const product = data[0]
 
       if (!product) {
-        throw new Error(`Catalog response for "${slug}" returned no products.`)
+        throw new Error(`Catalog response for "${catalogSlug}" returned no products.`)
       }
 
       return product
@@ -236,16 +256,18 @@ export const fetchCatalogProduct = async (
         throw error
       }
 
-      throw new Error(`Catalog request failed for "${slug}" with an unknown error.`)
+      throw new Error(
+        `Catalog request failed for "${catalogSlug}" with an unknown error.`
+      )
     }
   })()
 
-  catalogCache.set(slug, request)
+  catalogCache.set(catalogSlug, request)
 
   try {
     return await request
   } catch (error) {
-    catalogCache.delete(slug)
+    catalogCache.delete(catalogSlug)
     throw error
   }
 }
@@ -282,7 +304,7 @@ export const buildViewItem = (
     item_category2:
       readSpecification(catalog, 'INGREDIENTES') || categoryParts[1] || NOT_AVAILABLE,
     item_category3:
-      readSpecification(catalog, 'TIPO DE PRODUCTO', 'Textura/Acabado', 'Textura', 'Acabado') ||
+      readSpecification(catalog, 'TEXTURA', 'TIPO DE PRODUCTO', 'Textura/Acabado', 'Textura', 'Acabado') ||
       categoryParts[2] ||
       NOT_AVAILABLE,
     item_category4:
@@ -290,6 +312,7 @@ export const buildViewItem = (
     item_category5:
       readSpecification(
         catalog,
+        'TIPO DE PIEL',
         'Tipo piel/cabello',
         'Tipo piel',
         'Tipo cabello'
@@ -358,3 +381,24 @@ export const buildViewItemPayload = (
     items: [item],
   },
 })
+
+export const buildAddToCartPayload = (
+  items: ViewItem[],
+  currency: string
+): AddToCartPayload => {
+  const value = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const magentaPoints_value = items.reduce(
+    (sum, item) => sum + item.magentaPoints_price * item.quantity,
+    0
+  )
+
+  return {
+    event: 'add_to_cart',
+    ecommerce: {
+      currency,
+      value: Number(value.toFixed(2)),
+      magentaPoints_value,
+      items,
+    },
+  }
+}
