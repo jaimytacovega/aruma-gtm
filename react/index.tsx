@@ -1,6 +1,6 @@
 import { canUseDOM } from 'vtex.render-runtime'
 
-import type { PageViewData, PixelMessage, ProductClickData } from './typings/events'
+import type { PageViewData, PixelMessage, ProductClickData, ProductViewData } from './typings/events'
 
 import { pushToDataLayer, log } from './utils'
 
@@ -14,6 +14,7 @@ import { registerPickButtons } from './events/2_3_1_3__registerPickButtons'
 import { registerProductImpression } from './events/3_1__productImpression'
 import { fetchCatalogProduct } from './events/3_1__productImpression/catalog'
 import { productClick } from './events/3_2__productClick'
+import { productDetail } from './events/3_3__productDetail'
 
 let domClickListenerAttached = false
 
@@ -94,7 +95,15 @@ export const handleEvents = (e: PixelMessage) => {
                     })
             }
             
+            // TODO: 3.2 Product Click - Validate fields
             void productClick(data)
+            break
+        }
+
+        case 'vtex:productView': {
+            const data = e.data as ProductViewData
+
+            void productDetail(data)
             break
         }
 

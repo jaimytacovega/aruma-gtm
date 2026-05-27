@@ -64,6 +64,16 @@ export type ViewItemListPayload = {
   }
 }
 
+export type ViewItemPayload = {
+  event: 'view_item'
+  ecommerce: {
+    currency: string
+    value: number
+    magentaPoints_value: number
+    items: [ViewItem]
+  }
+}
+
 export type SelectItemPayload = {
   event: 'select_item'
   ecommerce: {
@@ -332,6 +342,19 @@ export const buildSelectItemPayload = (item: ViewItem): SelectItemPayload => ({
   ecommerce: {
     item_list_id: item.item_list_id,
     item_list_name: item.item_list_name,
+    items: [item],
+  },
+})
+
+export const buildViewItemPayload = (
+  item: ViewItem,
+  currency: string
+): ViewItemPayload => ({
+  event: 'view_item',
+  ecommerce: {
+    currency,
+    value: Number((item.price * item.quantity).toFixed(2)),
+    magentaPoints_value: item.magentaPoints_price * item.quantity,
     items: [item],
   },
 })
