@@ -84,6 +84,16 @@ export type AddToCartPayload = {
   }
 }
 
+export type ViewCartPayload = {
+  event: 'view_cart'
+  ecommerce: {
+    currency: string
+    value: number
+    magentaPoints_value: number
+    items: ViewItem[]
+  }
+}
+
 export type SelectItemPayload = {
   event: 'select_item'
   ecommerce: {
@@ -382,10 +392,7 @@ export const buildViewItemPayload = (
   },
 })
 
-export const buildAddToCartPayload = (
-  items: ViewItem[],
-  currency: string
-): AddToCartPayload => {
+const buildCartEcommerce = (items: ViewItem[], currency: string) => {
   const value = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const magentaPoints_value = items.reduce(
     (sum, item) => sum + item.magentaPoints_price * item.quantity,
@@ -393,12 +400,25 @@ export const buildAddToCartPayload = (
   )
 
   return {
-    event: 'add_to_cart',
-    ecommerce: {
-      currency,
-      value: Number(value.toFixed(2)),
-      magentaPoints_value,
-      items,
-    },
+    currency,
+    value: Number(value.toFixed(2)),
+    magentaPoints_value,
+    items,
   }
 }
+
+export const buildAddToCartPayload = (
+  items: ViewItem[],
+  currency: string
+): AddToCartPayload => ({
+  event: 'add_to_cart',
+  ecommerce: buildCartEcommerce(items, currency),
+})
+
+export const buildViewCartPayload = (
+  items: ViewItem[],
+  currency: string
+): ViewCartPayload => ({
+  event: 'view_cart',
+  ecommerce: buildCartEcommerce(items, currency),
+})

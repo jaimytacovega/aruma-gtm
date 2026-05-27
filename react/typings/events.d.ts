@@ -18,6 +18,7 @@ export interface PixelMessage extends MessageEvent {
     | PromotionClickData
     | NewsletterSubscriptionData
     | AddToWishlistData
+    | ViewCartData
 }
 
 export interface EventData {
@@ -110,6 +111,12 @@ export interface RemoveToCartData extends EventData {
 export interface CartChangedData extends EventData {
   event: 'cartChanged'
   eventName: 'vtex:cartChanged'
+  items: CartItem[]
+}
+
+export interface ViewCartData extends EventData {
+  event: 'viewCart'
+  eventName: 'vtex:viewCart'
   items: CartItem[]
 }
 
