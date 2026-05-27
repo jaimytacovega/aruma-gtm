@@ -184,7 +184,6 @@ const flushPendingBatches = async () => {
 
       const payload = buildViewItemListPayload(items, listId, listName)
 
-      // log('payload', payload)
       pushToDataLayer(payload, true)
     }
 

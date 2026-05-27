@@ -1,4 +1,4 @@
-import { log } from '../../utils'
+import { log, pushToDataLayer } from '../../utils'
 import type { AddToCartData } from '../../typings/events'
 
 import { buildAddToCartPayload } from '../3_1__productImpression/catalog'
@@ -14,7 +14,7 @@ const addToCart = async (data: AddToCartData) => {
 
   const payload = buildAddToCartPayload(items, data.currency)
 
-  log('add_to_cart payload', payload)
+  pushToDataLayer(payload)
 }
 
 export { addToCart }

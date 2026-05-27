@@ -42,7 +42,6 @@ const productClick = async (data: ProductClickData) => {
   const item = buildViewItem(product, catalog)
   const payload = buildSelectItemPayload(item)
 
-//   log('payload', payload)
   pushToDataLayer(payload, true)
 }
 

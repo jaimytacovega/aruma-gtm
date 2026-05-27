@@ -7,6 +7,7 @@ import type {
     PixelMessage,
     ProductClickData,
     ProductViewData,
+    RemoveToCartData,
     ViewCartData,
 } from './typings/events'
 
@@ -26,6 +27,7 @@ import { productDetail } from './events/3_3__productDetail'
 import { addToWishlist } from './events/3_4__addToWishlist'
 import { addToCart } from './events/3_5__addToCart'
 import { cartImpression } from './events/4_1__cartImpression'
+import { removeFromCart } from './events/4_2__removeFromCart'
 
 let domClickListenerAttached = false
 
@@ -137,6 +139,13 @@ export const handleEvents = (e: PixelMessage) => {
             const data = e.data as ViewCartData
 
             void cartImpression(data)
+            break
+        }
+
+        case 'vtex:removeFromCart': {
+            const data = e.data as RemoveToCartData
+
+            void removeFromCart(data)
             break
         }
 

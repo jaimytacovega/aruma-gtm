@@ -1,4 +1,4 @@
-import { log } from '../../utils'
+import { log, pushToDataLayer } from '../../utils'
 import type { ProductViewData } from '../../typings/events'
 
 import {
@@ -45,7 +45,7 @@ const productDetail = async (data: ProductViewData) => {
 
     const payload = buildViewItemPayload(item, data.currency)
 
-    log('view_item payload', payload)
+    pushToDataLayer(payload)
 }
 
 export {
