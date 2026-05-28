@@ -28,6 +28,7 @@ import { addToWishlist } from './events/3_4__addToWishlist'
 import { addToCart } from './events/3_5__addToCart'
 import { cartImpression } from './events/4_1__cartImpression'
 import { removeFromCart } from './events/4_2__removeFromCart'
+import { cartButtonsClick } from './events/4_3__cartButtonsClick'
 
 let domClickListenerAttached = false
 
@@ -57,6 +58,9 @@ const handleDocumentClick = (event: MouseEvent) => {
 
     // 2.3.1.3 Login modal buttons (Ingresar / Crear cuenta)
     registerPickButtons(target)
+
+    // TODO: 4.3 Cart page buttons — storefront minicart only; checkout cart uses checkout/checkout-ui-custom.js
+    cartButtonsClick(target)
 }
 
 /** VTEX has no pixel event for arbitrary DOM clicks — use delegation on document. */
