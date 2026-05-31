@@ -7,7 +7,8 @@
  * 3. checkout/checkoutCartItems.js
  * 4. checkout/5_1_2__startCheckout.js
  * 5. checkout/5_1_3__companyInfo.js
- * 6. This file
+ * 6. checkout/5_1_4__submitCompanyInfo.js
+ * 7. This file
  */
 ;(() => {
   if (window.__arumaGtmCheckoutInitialized) {
@@ -45,6 +46,13 @@
   if (typeof window.create5_1_3__companyInfo !== 'function') {
     console.error(
       '[aruma-gtm] Missing create5_1_3__companyInfo. Paste checkout/5_1_3__companyInfo.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create5_1_4__submitCompanyInfo !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create5_1_4__submitCompanyInfo. Paste checkout/5_1_4__submitCompanyInfo.js first.'
     )
     return
   }
@@ -128,6 +136,11 @@
     normalizeText,
   })
 
+  const submitCompanyInfo = window.create5_1_4__submitCompanyInfo({
+    pushToDataLayer,
+    normalizeText,
+  })
+
   const handleCartButtonsClick = (event) => {
     cartPickButtons(event)
   }
@@ -137,6 +150,7 @@
     checkoutScreening()
     startCheckout()
     companyInfo()
+    submitCompanyInfo()
     // Capture phase runs before Knockout's click: cart.next handler.
     document.addEventListener('click', handleCartButtonsClick, true)
   }
