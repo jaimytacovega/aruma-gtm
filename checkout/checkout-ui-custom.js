@@ -1,11 +1,12 @@
 /**
  * Checkout-only script. aruma-gtm (react/index.tsx) does NOT run on /checkout/#/cart.
  *
- * Deploy to checkout6-custom.js:
- * 1. Paste checkout/4_3__cartPickButtons.js
- * 2. Paste this file
- *
- * Or Admin: Checkout → gear → Code → checkout6-custom.js (append both in order).
+ * Deploy to checkout6-custom.js (paste in order):
+ * 1. checkout/4_3__cartPickButtons.js
+ * 2. checkout/5_1_1__checkoutScreening.js
+ * 3. checkout/checkoutCartItems.js
+ * 4. checkout/5_1_2__startCheckout.js
+ * 5. This file
  */
 ;(() => {
   if (window.__arumaGtmCheckoutInitialized) {
@@ -15,6 +16,27 @@
   if (typeof window.create4_3__cartPickButtons !== 'function') {
     console.error(
       '[aruma-gtm] Missing create4_3__cartPickButtons. Paste checkout/4_3__cartPickButtons.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create5_1_1__checkoutScreening !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create5_1_1__checkoutScreening. Paste checkout/5_1_1__checkoutScreening.js first.'
+    )
+    return
+  }
+
+  if (typeof window.createCheckoutCartItems !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing createCheckoutCartItems. Paste checkout/checkoutCartItems.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create5_1_2__startCheckout !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create5_1_2__startCheckout. Paste checkout/5_1_2__startCheckout.js first.'
     )
     return
   }
@@ -81,12 +103,26 @@
     normalizeText,
   })
 
+  const { NOT_AVAILABLE, enrichOrderFormItems } = window.createCheckoutCartItems()
+
+  const checkoutScreening = window.create5_1_1__checkoutScreening({
+    pushToDataLayer,
+  })
+
+  const startCheckout = window.create5_1_2__startCheckout({
+    pushToDataLayer,
+    enrichOrderFormItems,
+    NOT_AVAILABLE,
+  })
+
   const handleCartButtonsClick = (event) => {
     cartPickButtons(event)
   }
 
   const init = () => {
     pushAnalyticsLoaded()
+    checkoutScreening()
+    startCheckout()
     // Capture phase runs before Knockout's click: cart.next handler.
     document.addEventListener('click', handleCartButtonsClick, true)
   }
