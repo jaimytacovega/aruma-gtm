@@ -1,8 +1,19 @@
 /**
- * Paste this file into VTEX Admin → Store Settings → Checkout → Checkout UI Custom → JavaScript.
- * Pixel apps (aruma-gtm react/index.tsx) do not run on /checkout — only on the storefront.
+ * Checkout-only script. aruma-gtm (react/index.tsx) does NOT run on /checkout/#/cart.
+ *
+ * Where to paste (use whichever exists in your account):
+ *
+ * A) Checkout UI Custom app (vtex.checkout-ui-custom installed)
+ *    Admin search: "Checkout UI Custom"
+ *    Or: Store settings → Storefront → Checkout UI Custom → JavaScript tab → Publish
+ *
+ * B) Legacy checkout code editor (most common if A is missing)
+ *    Admin sidebar: Checkout → gear icon on your store → Code tab
+ *    → open checkout6-custom.js → paste at end → Save
+ *    Direct URL:
+ *    https://{account}.myvtex.com/admin/portal#/sites/default/code/files/checkout6-custom.js
  */
-;(function () {
+;(() => {
   if (window.__arumaGtmCheckoutInitialized) {
     return
   }
@@ -11,31 +22,31 @@
 
   window.dataLayer = window.dataLayer || []
 
-  var log = function () {
-    console.info.apply(console, ['[aruma-gtm]'].concat([].slice.call(arguments)))
+  const FINALIZE_SELECTOR =
+    '#cart-to-orderform, a[data-event="cartToOrderform"], a.btn-place-order'
+
+  const log = (...args) => {
+    console.info('[aruma-gtm]', ...args)
   }
 
-  var pushToDataLayer = function (payload) {
+  const pushToDataLayer = (payload) => {
     window.dataLayer.push(payload)
     log(JSON.stringify(payload))
   }
 
-  var isCheckoutCartPage = function () {
-    return (
-      window.location.pathname.indexOf('/checkout') !== -1 &&
-      (window.location.hash.indexOf('/cart') !== -1 ||
-        window.location.hash.indexOf('cart') !== -1)
-    )
-  }
+  const isCheckoutCartPage = () =>
+    window.location.pathname.includes('/checkout') &&
+    (window.location.hash.includes('/cart') ||
+      window.location.hash.includes('cart'))
 
-  var lastAnalyticsUrl = ''
+  let lastAnalyticsUrl = ''
 
-  var pushAnalyticsLoaded = function () {
+  const pushAnalyticsLoaded = () => {
     if (!isCheckoutCartPage()) {
       return
     }
 
-    var pageUrl = window.location.href
+    const pageUrl = window.location.href
 
     if (pageUrl === lastAnalyticsUrl) {
       return
@@ -46,15 +57,13 @@
     pushToDataLayer({
       event: 'analytics_loaded',
       pageTitle: document.title,
-      pageUrl: pageUrl,
+      pageUrl,
     })
   }
 
-  var normalizeText = function (value) {
-    return (value || '').replace(/\s+/g, ' ').trim()
-  }
+  const normalizeText = (value) => (value || '').replace(/\s+/g, ' ').trim()
 
-  var pushCartButtonEvent = function (cta) {
+  const pushCartButtonEvent = (cta) => {
     pushToDataLayer({
       event: 'virtualEvent',
       portal: 'Aruma',
@@ -64,58 +73,101 @@
       intencion: cta,
       accion: 'Seleccionar elemento',
       elemento: 'Boton',
-      cta: cta,
+      cta,
     })
   }
 
-  var handleCartButtonsClick = function (event) {
+  const matchesFinalizeButton = (element) => {
+    if (!(element instanceof Element)) {
+      return false
+    }
+
+    return element.matches(FINALIZE_SELECTOR)
+  }
+
+  /** Knockout may stop bubble; disabled button uses pointer-events:none (click goes through). */
+  const findFinalizeButton = (event) => {
+    if (typeof event.composedPath === 'function') {
+      const fromPath = event
+        .composedPath()
+        .find((node) => matchesFinalizeButton(node))
+
+      if (fromPath) {
+        return fromPath
+      }
+    }
+
+    if (event.target instanceof Element) {
+      const fromTarget = event.target.closest(FINALIZE_SELECTOR)
+
+      if (fromTarget) {
+        return fromTarget
+      }
+    }
+
+    const button = document.querySelector('#cart-to-orderform')
+
+    if (!button || typeof event.clientX !== 'number') {
+      return null
+    }
+
+    const rect = button.getBoundingClientRect()
+
+    if (
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom
+    ) {
+      return button
+    }
+
+    return null
+  }
+
+  const handleCartButtonsClick = (event) => {
     if (!isCheckoutCartPage()) {
       return
     }
 
-    var target = event.target
-
-    if (!target || !target.closest) {
-      return
-    }
-
-    var finalizeButton = target.closest(
-      '#cart-to-orderform, a[data-event="cartToOrderform"]'
-    )
+    const finalizeButton = findFinalizeButton(event)
 
     if (finalizeButton) {
-      var finalizeCta =
-        normalizeText(finalizeButton.textContent) || 'Finalizar compra'
+      const finalizeCta = 'Finalizar compra'
 
       pushCartButtonEvent(finalizeCta)
 
       return
     }
 
-    var continueShoppingButton = target.closest('.boton-seguir-comprando a')
+    const target = event.target
+
+    if (!(target instanceof Element)) {
+      return
+    }
+
+    const continueShoppingButton = target.closest('.boton-seguir-comprando a')
 
     if (!continueShoppingButton) {
       return
     }
 
-    var continueCta =
-      normalizeText(
-        continueShoppingButton.querySelector('p')
-          ? continueShoppingButton.querySelector('p').textContent
-          : ''
-      ) ||
+    const continueLabel = continueShoppingButton.querySelector('p')
+    const continueCta =
+      normalizeText(continueLabel ? continueLabel.textContent : '') ||
       normalizeText(continueShoppingButton.textContent) ||
       'Seguir comprando'
 
     pushCartButtonEvent(continueCta)
   }
 
-  var init = function () {
+  const init = () => {
     pushAnalyticsLoaded()
-    document.addEventListener('click', handleCartButtonsClick, false)
+    // Capture phase runs before Knockout's click: cart.next handler.
+    document.addEventListener('click', handleCartButtonsClick, true)
   }
 
-  window.addEventListener('hashchange', function () {
+  window.addEventListener('hashchange', () => {
     lastAnalyticsUrl = ''
     pushAnalyticsLoaded()
   })

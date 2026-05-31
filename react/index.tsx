@@ -28,7 +28,6 @@ import { addToWishlist } from './events/3_4__addToWishlist'
 import { addToCart } from './events/3_5__addToCart'
 import { cartImpression } from './events/4_1__cartImpression'
 import { removeFromCart } from './events/4_2__removeFromCart'
-import { cartButtonsClick } from './events/4_3__cartButtonsClick'
 
 let domClickListenerAttached = false
 
@@ -58,9 +57,6 @@ const handleDocumentClick = (event: MouseEvent) => {
 
     // 2.3.1.3 Login modal buttons (Ingresar / Crear cuenta)
     registerPickButtons(target)
-
-    // TODO: 4.3 Cart page buttons — storefront minicart only; checkout cart uses checkout/checkout-ui-custom.js
-    cartButtonsClick(target)
 }
 
 /** VTEX has no pixel event for arbitrary DOM clicks — use delegation on document. */
@@ -89,7 +85,7 @@ export const handleEvents = (e: PixelMessage) => {
             setupDomClickListeners()
             registerLoginModal()
 
-            // TODO: 3.1 Product Impression - Validate fields
+            // 3.1 Product Impression
             // After analytics_loaded — avoid product seen before page context on first paint
             registerProductImpression()
 
@@ -112,8 +108,8 @@ export const handleEvents = (e: PixelMessage) => {
                     })
             }
             
-            // TODO: 3.2 Product Click - Validate fields
-            void productClick(data)
+            // 3.2 Product Click
+            productClick(data)
             break
         }
 
@@ -135,21 +131,23 @@ export const handleEvents = (e: PixelMessage) => {
         case 'vtex:addToCart': {
             const data = e.data as AddToCartData
 
-            void addToCart(data)
+            addToCart(data)
             break
         }
 
         case 'vtex:viewCart': {
             const data = e.data as ViewCartData
 
-            void cartImpression(data)
+            // TODO: 4.1 Only on storefront minicart
+            cartImpression(data)
             break
         }
 
         case 'vtex:removeFromCart': {
             const data = e.data as RemoveToCartData
 
-            void removeFromCart(data)
+            // TODO: 4.2 Only on storefront minicart
+            removeFromCart(data)
             break
         }
 
