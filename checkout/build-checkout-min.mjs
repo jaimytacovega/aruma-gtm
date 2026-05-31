@@ -18,6 +18,7 @@ const SOURCES = [
   '5_1_4__submitCompanyInfo.js',
   '5_2_1__shippingScreening.js',
   '5_2_2__submitShipping.js',
+  '5_2_3__shippingPickButton.js',
   'checkout-ui-custom.js',
 ]
 

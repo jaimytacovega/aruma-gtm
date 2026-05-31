@@ -13,7 +13,8 @@
  * 6. checkout/5_1_4__submitCompanyInfo.js
  * 7. checkout/5_2_1__shippingScreening.js
  * 8. checkout/5_2_2__submitShipping.js
- * 9. This file
+ * 9. checkout/5_2_3__shippingPickButton.js
+ * 10. This file
  */
 ;(() => {
   if (window.__arumaGtmCheckoutInitialized) {
@@ -72,6 +73,13 @@
   if (typeof window.create5_2_2__submitShipping !== 'function') {
     console.error(
       '[aruma-gtm] Missing create5_2_2__submitShipping. Paste checkout/5_2_2__submitShipping.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create5_2_3__shippingPickButton !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create5_2_3__shippingPickButton. Paste checkout/5_2_3__shippingPickButton.js first.'
     )
     return
   }
@@ -171,6 +179,11 @@
     NOT_AVAILABLE,
   })
 
+  const shippingPickButton = window.create5_2_3__shippingPickButton({
+    pushToDataLayer,
+    normalizeText,
+  })
+
   const handleCartButtonsClick = (event) => {
     cartPickButtons(event)
   }
@@ -183,6 +196,7 @@
     submitCompanyInfo()
     shippingScreening()
     submitShipping()
+    shippingPickButton()
     // Capture phase runs before Knockout's click: cart.next handler.
     document.addEventListener('click', handleCartButtonsClick, true)
   }
