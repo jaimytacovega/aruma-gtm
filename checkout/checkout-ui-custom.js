@@ -1,14 +1,19 @@
 /**
  * Checkout-only script. aruma-gtm (react/index.tsx) does NOT run on /checkout/#/cart.
  *
- * Deploy to checkout6-custom.js (paste in order):
+ * Deploy (single paste): checkout/checkout-ui-custom.min.js → checkout6-custom.js
+ * Regenerate min bundle after edits: node checkout/build-checkout-min.mjs
+ *
+ * Deploy (separate files, paste in order):
  * 1. checkout/4_3__cartPickButtons.js
  * 2. checkout/5_1_1__checkoutScreening.js
  * 3. checkout/checkoutCartItems.js
  * 4. checkout/5_1_2__startCheckout.js
  * 5. checkout/5_1_3__companyInfo.js
  * 6. checkout/5_1_4__submitCompanyInfo.js
- * 7. This file
+ * 7. checkout/5_2_1__shippingScreening.js
+ * 8. checkout/5_2_2__submitShipping.js
+ * 9. This file
  */
 ;(() => {
   if (window.__arumaGtmCheckoutInitialized) {
@@ -53,6 +58,20 @@
   if (typeof window.create5_1_4__submitCompanyInfo !== 'function') {
     console.error(
       '[aruma-gtm] Missing create5_1_4__submitCompanyInfo. Paste checkout/5_1_4__submitCompanyInfo.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create5_2_1__shippingScreening !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create5_2_1__shippingScreening. Paste checkout/5_2_1__shippingScreening.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create5_2_2__submitShipping !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create5_2_2__submitShipping. Paste checkout/5_2_2__submitShipping.js first.'
     )
     return
   }
@@ -141,6 +160,17 @@
     normalizeText,
   })
 
+  const shippingScreening = window.create5_2_1__shippingScreening({
+    pushToDataLayer,
+  })
+
+  const submitShipping = window.create5_2_2__submitShipping({
+    pushToDataLayer,
+    enrichOrderFormItems,
+    normalizeText,
+    NOT_AVAILABLE,
+  })
+
   const handleCartButtonsClick = (event) => {
     cartPickButtons(event)
   }
@@ -151,6 +181,8 @@
     startCheckout()
     companyInfo()
     submitCompanyInfo()
+    shippingScreening()
+    submitShipping()
     // Capture phase runs before Knockout's click: cart.next handler.
     document.addEventListener('click', handleCartButtonsClick, true)
   }

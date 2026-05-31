@@ -1,0 +1,52 @@
+/**
+ * Merges checkout modules into checkout-ui-custom.min.js
+ * Run from repo root: node checkout/build-checkout-min.mjs
+ */
+import { readFileSync, writeFileSync } from 'fs'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
+import { execSync } from 'child_process'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+const SOURCES = [
+  '4_3__cartPickButtons.js',
+  '5_1_1__checkoutScreening.js',
+  'checkoutCartItems.js',
+  '5_1_2__startCheckout.js',
+  '5_1_3__companyInfo.js',
+  '5_1_4__submitCompanyInfo.js',
+  '5_2_1__shippingScreening.js',
+  '5_2_2__submitShipping.js',
+  'checkout-ui-custom.js',
+]
+
+const stripLeadingFileComment = (code) =>
+  code.replace(/^\s*\/\*\*[\s\S]*?\*\/\s*/, '')
+
+const merged = SOURCES.map((file) => {
+  const path = join(__dirname, file)
+  return stripLeadingFileComment(readFileSync(path, 'utf8')).trim()
+}).join('\n')
+
+const banner =
+  '/*! aruma-gtm checkout bundle — AUTO-GENERATED. Edit source files, then: node checkout/build-checkout-min.mjs */\n'
+
+let output = `${banner}${merged}\n`
+
+try {
+  output = execSync('npx --yes terser --compress --mangle --comments /^!/', {
+    input: output,
+    encoding: 'utf8',
+    maxBuffer: 10 * 1024 * 1024,
+  })
+  if (!output.startsWith('/*!')) {
+    output = banner + output
+  }
+} catch {
+  output = output.replace(/\n\s*\n/g, '\n').replace(/\/\/[^\n]*/g, '')
+}
+
+const outPath = join(__dirname, 'checkout-ui-custom.min.js')
+writeFileSync(outPath, output, 'utf8')
+console.info(`Wrote ${outPath} (${output.length} bytes)`)
