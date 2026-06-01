@@ -13,6 +13,7 @@ const SOURCES = [
   '4_3__cartPickButtons.js',
   '5_1_1__checkoutScreening.js',
   'checkoutCartItems.js',
+  'checkoutOrderFormUtils.js',
   '5_1_2__startCheckout.js',
   '5_1_3__companyInfo.js',
   '5_1_4__submitCompanyInfo.js',
@@ -20,6 +21,10 @@ const SOURCES = [
   '5_2_2__submitShipping.js',
   '5_2_3__shippingPickButton.js',
   '5_3_1__paymentScreening.js',
+  '5_3_2__paymentInfo.js',
+  '5_3_3__paymentPickButton.js',
+  '5_4_1__successPaymentScreening.js',
+  '5_4_2__successPayment.js',
   'checkout-ui-custom.js',
 ]
 

@@ -8,14 +8,19 @@
  * 1. checkout/4_3__cartPickButtons.js
  * 2. checkout/5_1_1__checkoutScreening.js
  * 3. checkout/checkoutCartItems.js
- * 4. checkout/5_1_2__startCheckout.js
- * 5. checkout/5_1_3__companyInfo.js
- * 6. checkout/5_1_4__submitCompanyInfo.js
- * 7. checkout/5_2_1__shippingScreening.js
- * 8. checkout/5_2_2__submitShipping.js
- * 9. checkout/5_2_3__shippingPickButton.js
- * 10. checkout/5_3_1__paymentScreening.js
- * 11. This file
+ * 4. checkout/checkoutOrderFormUtils.js
+ * 5. checkout/5_1_2__startCheckout.js
+ * 6. checkout/5_1_3__companyInfo.js
+ * 7. checkout/5_1_4__submitCompanyInfo.js
+ * 8. checkout/5_2_1__shippingScreening.js
+ * 9. checkout/5_2_2__submitShipping.js
+ * 10. checkout/5_2_3__shippingPickButton.js
+ * 11. checkout/5_3_1__paymentScreening.js
+ * 12. checkout/5_3_2__paymentInfo.js
+ * 13. checkout/5_3_3__paymentPickButton.js
+ * 14. checkout/5_4_1__successPaymentScreening.js
+ * 15. checkout/5_4_2__successPayment.js
+ * 16. This file
  */
 ;(() => {
   if (window.__arumaGtmCheckoutInitialized) {
@@ -39,6 +44,13 @@
   if (typeof window.createCheckoutCartItems !== 'function') {
     console.error(
       '[aruma-gtm] Missing createCheckoutCartItems. Paste checkout/checkoutCartItems.js first.'
+    )
+    return
+  }
+
+  if (typeof window.createCheckoutOrderFormUtils !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing createCheckoutOrderFormUtils. Paste checkout/checkoutOrderFormUtils.js first.'
     )
     return
   }
@@ -88,6 +100,34 @@
   if (typeof window.create5_3_1__paymentScreening !== 'function') {
     console.error(
       '[aruma-gtm] Missing create5_3_1__paymentScreening. Paste checkout/5_3_1__paymentScreening.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create5_3_2__paymentInfo !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create5_3_2__paymentInfo. Paste checkout/5_3_2__paymentInfo.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create5_3_3__paymentPickButton !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create5_3_3__paymentPickButton. Paste checkout/5_3_3__paymentPickButton.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create5_4_1__successPaymentScreening !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create5_4_1__successPaymentScreening. Paste checkout/5_4_1__successPaymentScreening.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create5_4_2__successPayment !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create5_4_2__successPayment. Paste checkout/5_4_2__successPayment.js first.'
     )
     return
   }
@@ -155,6 +195,7 @@
   })
 
   const { NOT_AVAILABLE, enrichOrderFormItems } = window.createCheckoutCartItems()
+  const orderFormUtils = window.createCheckoutOrderFormUtils(NOT_AVAILABLE)
 
   const checkoutScreening = window.create5_1_1__checkoutScreening({
     pushToDataLayer,
@@ -196,6 +237,31 @@
     pushToDataLayer,
   })
 
+  const paymentInfo = window.create5_3_2__paymentInfo({
+    pushToDataLayer,
+    enrichOrderFormItems,
+    NOT_AVAILABLE,
+    orderFormUtils,
+  })
+
+  const paymentPickButton = window.create5_3_3__paymentPickButton({
+    pushToDataLayer,
+    normalizeText,
+    orderFormUtils,
+  })
+
+  const successPaymentScreening = window.create5_4_1__successPaymentScreening({
+    pushToDataLayer,
+    orderFormUtils,
+  })
+
+  const successPayment = window.create5_4_2__successPayment({
+    pushToDataLayer,
+    enrichOrderFormItems,
+    NOT_AVAILABLE,
+    orderFormUtils,
+  })
+
   const handleCartButtonsClick = (event) => {
     cartPickButtons(event)
   }
@@ -210,6 +276,10 @@
     submitShipping()
     shippingPickButton()
     paymentScreening()
+    paymentInfo()
+    paymentPickButton()
+    successPaymentScreening()
+    successPayment()
     // Capture phase runs before Knockout's click: cart.next handler.
     document.addEventListener('click', handleCartButtonsClick, true)
   }
