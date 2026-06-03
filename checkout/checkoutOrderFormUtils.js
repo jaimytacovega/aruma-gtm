@@ -9,11 +9,28 @@
       global.location.pathname.includes('/checkout') &&
       global.location.hash.includes('/payment')
 
-    const isCheckoutOrderPlacedPage = () =>
-      global.location.pathname.includes('/checkout') &&
-      (global.location.hash.includes('/orderplaced') ||
-        global.location.hash.includes('orderplaced') ||
-        global.location.hash.includes('/confirmation'))
+    const getOrderGroupFromUrl = () =>
+      new URLSearchParams(global.location.search).get('og') || ''
+
+    const isCheckoutOrderPlacedPage = () => {
+      const path = global.location.pathname.toLowerCase()
+
+      if (path.includes('/checkout/orderplaced')) {
+        return true
+      }
+
+      if (!path.includes('/checkout')) {
+        return false
+      }
+
+      const hash = global.location.hash.toLowerCase()
+
+      return (
+        hash.includes('/orderplaced') ||
+        hash.includes('orderplaced') ||
+        hash.includes('/confirmation')
+      )
+    }
 
     const getTotalizerValue = (orderForm, id) => {
       const totalizer = orderForm?.totalizers?.find((entry) => entry.id === id)
@@ -93,7 +110,7 @@
     }
 
     const getTransactionId = (orderForm) => {
-      const fromUrl = new URLSearchParams(global.location.search).get('og')
+      const fromUrl = getOrderGroupFromUrl()
 
       if (fromUrl) {
         return fromUrl
@@ -105,6 +122,83 @@
         orderForm?.orderFormId ||
         NOT_AVAILABLE
       )
+    }
+
+    const fetchOrdersByOrderGroup = async (orderGroupId) => {
+      if (!orderGroupId) {
+        return null
+      }
+
+      if (global.vtexjs?.checkout?.getOrders) {
+        try {
+          const orders = await new Promise((resolve, reject) => {
+            global.vtexjs.checkout.getOrders(orderGroupId).done(resolve).fail(reject)
+          })
+
+          if (Array.isArray(orders) && orders.length) {
+            return orders
+          }
+        } catch {
+          // fall through to fetch
+        }
+      }
+
+      try {
+        const response = await fetch(
+          `/api/checkout/pub/orders/order-group/${encodeURIComponent(orderGroupId)}`,
+          { credentials: 'same-origin' }
+        )
+
+        if (!response.ok) {
+          return null
+        }
+
+        const data = await response.json()
+
+        return Array.isArray(data) ? data : null
+      } catch {
+        return null
+      }
+    }
+
+    const buildOrderFormFromOrders = (orders) => {
+      if (!Array.isArray(orders) || !orders.length) {
+        return null
+      }
+
+      const primary = orders[0]
+      const items = orders.flatMap((order) => order.items || [])
+
+      if (!items.length) {
+        return null
+      }
+
+      return {
+        ...primary,
+        items,
+        orderGroup: primary.orderGroup || getOrderGroupFromUrl(),
+        value: orders.reduce((sum, order) => sum + (order.value || 0), 0),
+      }
+    }
+
+    const loadOrderPlacedOrderForm = async () => {
+      if (global.vtexjs?.checkout?.getOrderForm) {
+        try {
+          const orderForm = await new Promise((resolve, reject) => {
+            global.vtexjs.checkout.getOrderForm().done(resolve).fail(reject)
+          })
+
+          if (orderForm?.items?.length) {
+            return orderForm
+          }
+        } catch {
+          // fall through
+        }
+      }
+
+      const orders = await fetchOrdersByOrderGroup(getOrderGroupFromUrl())
+
+      return buildOrderFormFromOrders(orders)
     }
 
     const buildItemsEcommerceTotals = (items) => {
@@ -123,6 +217,8 @@
     return {
       isCheckoutPaymentPage,
       isCheckoutOrderPlacedPage,
+      getOrderGroupFromUrl,
+      loadOrderPlacedOrderForm,
       getCurrency,
       getCoupon,
       getOrderValue,

@@ -1,7 +1,10 @@
 /**
- * Checkout order placed: purchase event.
+ * Checkout order placed (/checkout/orderPlaced/?og=...): purchase event.
  */
 ;((global) => {
+  const LOAD_RETRY_MS = 500
+  const LOAD_MAX_ATTEMPTS = 12
+
   global.create5_4_2__successPayment = ({
     pushToDataLayer,
     enrichOrderFormItems,
@@ -9,6 +12,8 @@
     orderFormUtils,
   }) => {
     let lastPurchaseTransactionId = ''
+    let loadAttempts = 0
+    let loadTimeoutId = null
 
     const buildPurchasePayload = (
       items,
@@ -82,14 +87,56 @@
       )
     }
 
-    const requestOrderForm = () => {
-      if (!global.vtexjs?.checkout?.getOrderForm) {
+    const tryLoadAndRunPurchase = async () => {
+      if (!orderFormUtils.isCheckoutOrderPlacedPage()) {
+        return false
+      }
+
+      const orderForm = await orderFormUtils.loadOrderPlacedOrderForm()
+
+      if (orderForm?.items?.length) {
+        await runPurchase(orderForm)
+        return true
+      }
+
+      return false
+    }
+
+    const scheduleLoadRetry = () => {
+      if (!orderFormUtils.isCheckoutOrderPlacedPage()) {
         return
       }
 
-      global.vtexjs.checkout.getOrderForm().done((orderForm) => {
-        void runPurchase(orderForm)
-      })
+      if (loadAttempts >= LOAD_MAX_ATTEMPTS) {
+        return
+      }
+
+      loadAttempts += 1
+
+      loadTimeoutId = global.setTimeout(async () => {
+        const completed = await tryLoadAndRunPurchase()
+
+        if (!completed) {
+          scheduleLoadRetry()
+        }
+      }, LOAD_RETRY_MS)
+    }
+
+    const requestOrderForm = () => {
+      loadAttempts = 0
+
+      if (loadTimeoutId !== null) {
+        global.clearTimeout(loadTimeoutId)
+        loadTimeoutId = null
+      }
+
+      void (async () => {
+        const completed = await tryLoadAndRunPurchase()
+
+        if (!completed) {
+          scheduleLoadRetry()
+        }
+      })()
     }
 
     const handleHashChange = () => {
@@ -99,6 +146,12 @@
       }
 
       lastPurchaseTransactionId = ''
+      loadAttempts = 0
+
+      if (loadTimeoutId !== null) {
+        global.clearTimeout(loadTimeoutId)
+        loadTimeoutId = null
+      }
     }
 
     const handleOrderFormUpdated = (_, orderForm) => {
@@ -106,9 +159,7 @@
         return
       }
 
-      if (orderForm?.orderGroup || orderForm?.id) {
-        void runPurchase(orderForm)
-      }
+      void runPurchase(orderForm)
     }
 
     const attach = () => {
@@ -117,6 +168,7 @@
       }
 
       global.addEventListener('hashchange', handleHashChange)
+      global.addEventListener('pageshow', requestOrderForm)
 
       if (global.jQuery) {
         global.jQuery(global).on('orderFormUpdated.vtex', handleOrderFormUpdated)

@@ -41,7 +41,9 @@
 
     const attach = () => {
       pushSuccessPaymentVirtualPage()
+
       global.addEventListener('hashchange', onHashChange)
+      global.addEventListener('pageshow', pushSuccessPaymentVirtualPage)
     }
 
     return attach
