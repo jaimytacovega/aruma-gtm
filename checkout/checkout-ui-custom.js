@@ -219,6 +219,7 @@
 
   const shippingScreening = window.create5_2_1__shippingScreening({
     pushToDataLayer,
+    ensureCheckoutScreening: checkoutScreening.ensureIdentificationVirtualPage,
   })
 
   const submitShipping = window.create5_2_2__submitShipping({
@@ -268,7 +269,7 @@
 
   const init = () => {
     pushAnalyticsLoaded()
-    checkoutScreening()
+    checkoutScreening.attach()
     startCheckout()
     companyInfo()
     submitCompanyInfo()
