@@ -6,46 +6,82 @@
     pushToDataLayer,
     orderFormUtils,
   }) => {
+    const log = (...args) => {
+      console.info('[aruma-gtm]', '5_4_1__successPaymentScreening', ...args)
+    }
+
     let lastVirtualPageUrl = ''
 
-    const getPageTitle = () => document.title || 'Checkout'
+    const pushSuccessPaymentVirtualPage = (source) => {
+      const isOrderPlaced = orderFormUtils.isCheckoutOrderPlacedPage()
+      const pageUrl = global.location.href
 
-    const pushSuccessPaymentVirtualPage = () => {
-      if (!orderFormUtils.isCheckoutOrderPlacedPage()) {
+      log('push attempt', {
+        source,
+        isOrderPlaced,
+        pathname: global.location.pathname,
+        hash: global.location.hash,
+        search: global.location.search,
+        pageUrl,
+        lastVirtualPageUrl,
+      })
+
+      if (!isOrderPlaced) {
+        log('skip: not order placed page')
         return
       }
 
-      const pageUrl = global.location.href
-
       if (pageUrl === lastVirtualPageUrl) {
+        log('skip: duplicate pageUrl')
         return
       }
 
       lastVirtualPageUrl = pageUrl
 
-      pushToDataLayer({
+      const payload = {
         event: 'virtualPage',
         page_location: pageUrl,
-        page_title: getPageTitle(),
-      })
+        page_title: 'Aruma - Checkout - Compra exitosa',
+      }
+
+      log('pushing virtualPage', payload)
+      pushToDataLayer(payload)
     }
 
     const onHashChange = () => {
+      log('hashchange', {
+        href: global.location.href,
+        isOrderPlaced: orderFormUtils.isCheckoutOrderPlacedPage(),
+      })
+
       if (!orderFormUtils.isCheckoutOrderPlacedPage()) {
         lastVirtualPageUrl = ''
+        log('left order placed page, reset dedupe')
         return
       }
 
-      pushSuccessPaymentVirtualPage()
+      pushSuccessPaymentVirtualPage('hashchange')
+    }
+
+    const sync = () => {
+      pushSuccessPaymentVirtualPage('sync')
     }
 
     const attach = () => {
-      pushSuccessPaymentVirtualPage()
+      log('attach', {
+        href: global.location.href,
+        isOrderPlaced: orderFormUtils.isCheckoutOrderPlacedPage(),
+        orderGroup: orderFormUtils.getOrderGroupFromUrl?.() ?? '',
+      })
+
+      pushSuccessPaymentVirtualPage('attach')
 
       global.addEventListener('hashchange', onHashChange)
-      global.addEventListener('pageshow', pushSuccessPaymentVirtualPage)
+      global.addEventListener('pageshow', () => {
+        pushSuccessPaymentVirtualPage('pageshow')
+      })
     }
 
-    return attach
+    return { attach, sync }
   }
 })(window)

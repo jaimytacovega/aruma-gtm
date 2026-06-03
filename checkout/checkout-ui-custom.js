@@ -147,8 +147,7 @@
 
   const isCheckoutCartPage = () =>
     window.location.pathname.includes('/checkout') &&
-    (window.location.hash.includes('/cart') ||
-      window.location.hash.includes('cart'))
+    window.location.hash.includes('/cart')
 
   let lastAnalyticsUrl = ''
 
@@ -265,6 +264,32 @@
     orderFormUtils,
   })
 
+  const syncOrderPlacedEvents = () => {
+    if (!orderFormUtils.isCheckoutOrderPlacedPage()) {
+      return
+    }
+
+    log('syncOrderPlacedEvents', window.location.href)
+    successPaymentScreening.sync()
+    successPayment.sync()
+  }
+
+  window.__arumaGtmOrderPlacedSync = syncOrderPlacedEvents
+
+  let lastWatchedHref = window.location.href
+
+  const watchCheckoutHref = () => {
+    if (window.location.href === lastWatchedHref) {
+      return
+    }
+
+    lastWatchedHref = window.location.href
+    log('href changed', lastWatchedHref)
+    syncOrderPlacedEvents()
+    lastAnalyticsUrl = ''
+    pushAnalyticsLoaded()
+  }
+
   const handleCartButtonsClick = (event) => {
     cartPickButtons(event)
   }
@@ -281,13 +306,20 @@
     paymentScreening()
     paymentInfo()
     paymentPickButton()
-    successPaymentScreening()
-    successPayment()
+    successPaymentScreening.attach()
+    successPayment.attach()
+    syncOrderPlacedEvents()
     // Capture phase runs before Knockout's click: cart.next handler.
     document.addEventListener('click', handleCartButtonsClick, true)
   }
 
+  window.setInterval(watchCheckoutHref, 400)
+  window.addEventListener('popstate', syncOrderPlacedEvents)
+  window.addEventListener('pageshow', syncOrderPlacedEvents)
+
   window.addEventListener('hashchange', () => {
+    lastWatchedHref = window.location.href
+    syncOrderPlacedEvents()
     lastAnalyticsUrl = ''
     pushAnalyticsLoaded()
   })

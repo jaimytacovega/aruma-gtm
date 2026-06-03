@@ -13,22 +13,23 @@
       new URLSearchParams(global.location.search).get('og') || ''
 
     const isCheckoutOrderPlacedPage = () => {
-      const path = global.location.pathname.toLowerCase()
+      const { pathname, hash } = global.location
 
-      if (path.includes('/checkout/orderplaced')) {
+      // VTEX uses /checkout/orderPlaced/ (capital P); match pathname only, case-insensitive.
+      if (/\/checkout\/orderplaced/i.test(pathname)) {
         return true
       }
 
-      if (!path.includes('/checkout')) {
+      if (!/\/checkout/i.test(pathname)) {
         return false
       }
 
-      const hash = global.location.hash.toLowerCase()
+      const hashLower = hash.toLowerCase()
 
       return (
-        hash.includes('/orderplaced') ||
-        hash.includes('orderplaced') ||
-        hash.includes('/confirmation')
+        hashLower.includes('/orderplaced') ||
+        hashLower.includes('orderplaced') ||
+        hashLower.includes('/confirmation')
       )
     }
 
