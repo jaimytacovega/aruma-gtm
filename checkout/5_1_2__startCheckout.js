@@ -1,10 +1,16 @@
 /**
- * Checkout profile step (#/profile): begin_checkout. Paste after checkoutCartItems.js.
+ * Checkout identification (#/profile, #/email): begin_checkout. Paste after checkoutCartItems.js.
  */
 ;((global) => {
-  const isCheckoutProfilePage = () =>
-    global.location.pathname.includes('/checkout') &&
-    global.location.hash.includes('/profile')
+  const isCheckoutIdentificationPage = () => {
+    if (!global.location.pathname.includes('/checkout')) {
+      return false
+    }
+
+    const hash = global.location.hash
+
+    return hash.includes('/profile') || hash.includes('/email')
+  }
 
   global.create5_1_2__startCheckout = ({
     pushToDataLayer,
@@ -33,7 +39,7 @@
     }
 
     const runStartCheckout = async (orderForm) => {
-      if (!isCheckoutProfilePage() || beginCheckoutFired) {
+      if (!isCheckoutIdentificationPage() || beginCheckoutFired) {
         return
       }
 
@@ -74,7 +80,7 @@
         return
       }
 
-      if (isCheckoutProfilePage()) {
+      if (isCheckoutIdentificationPage()) {
         requestOrderForm()
       }
     }
