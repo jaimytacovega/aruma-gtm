@@ -236,6 +236,8 @@
 
   const paymentScreening = window.create5_3_1__paymentScreening({
     pushToDataLayer,
+    ensureCheckoutScreening: checkoutScreening.ensureIdentificationVirtualPage,
+    ensureShippingScreening: shippingScreening.ensureShippingVirtualPage,
   })
 
   const paymentInfo = window.create5_3_2__paymentInfo({
@@ -273,7 +275,7 @@
     startCheckout()
     companyInfo()
     submitCompanyInfo()
-    shippingScreening()
+    shippingScreening.attach()
     submitShipping()
     shippingPickButton()
     paymentScreening()
