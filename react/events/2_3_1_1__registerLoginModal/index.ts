@@ -6,6 +6,7 @@ import { pushToDataLayer } from '../../utils'
 const LOGIN_MODAL_SELECTOR =
   '[class*="aruma-login-0-x-emailAndPasswordForm"]'
 const LOGIN_MODAL_PAGE_TITLE = 'Aruma - Inicio sesion'
+const LOGIN_MODAL_PAGE_PATH = '/inicio-sesion'
 
 let observerAttached = false
 let modalWasVisible = false
@@ -29,7 +30,7 @@ const isLoginModalVisible = (): HTMLElement | null => {
 const pushLoginVirtualPage = () => {
   pushToDataLayer({
     event: 'virtualPage',
-    page_location: window.location.href,
+    page_location: `${window.location.origin}${LOGIN_MODAL_PAGE_PATH}`,
     page_title: LOGIN_MODAL_PAGE_TITLE,
   })
 }
