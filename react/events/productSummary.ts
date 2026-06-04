@@ -85,6 +85,9 @@ const SECTION_TITLE_SELECTOR = [
 
 const SHELF_CONTAINER_SELECTOR = '[class*="sliderLayoutContainer"]'
 
+const SEARCH_AUTOCOMPLETE_SELECTOR =
+  '[data-af-element="search-autocomplete"][class*="tileList"], [class*="tileList"][data-af-element="search-autocomplete"]'
+
 const SECTION_ROOT_SELECTOR =
   'section[class*="container"], section[class*="store-components"]'
 
@@ -179,11 +182,26 @@ export type VisibleProduct = {
   listName: string
 }
 
+export const isSearchAutocompleteProductCard = (
+  productEl: HTMLElement
+): boolean =>
+  productEl.closest(SEARCH_AUTOCOMPLETE_SELECTOR) instanceof Element
+
 export const getListContext = (productEl: HTMLElement): {
   listId: string
   listName: string
   listRoot: ParentNode
 } => {
+  const autocompleteRoot = productEl.closest(SEARCH_AUTOCOMPLETE_SELECTOR)
+
+  if (autocompleteRoot) {
+    return {
+      listId: 'Buscador',
+      listName: 'Buscador',
+      listRoot: autocompleteRoot,
+    }
+  }
+
   const shelf = productEl.closest(SHELF_CONTAINER_SELECTOR)
 
   if (shelf instanceof HTMLElement) {
@@ -242,6 +260,17 @@ export const getProductIndex = (
   productEl: HTMLElement,
   listRoot: ParentNode
 ): number => {
+  const listItem = productEl.closest('[class*="tileListItem"]')
+  const position = listItem?.getAttribute('data-af-product-position')
+
+  if (position) {
+    const parsed = Number.parseInt(position, 10)
+
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed
+    }
+  }
+
   const shelf = productEl.closest(SHELF_CONTAINER_SELECTOR)
   const scope =
     shelf instanceof HTMLElement ? shelf : listRoot

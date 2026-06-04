@@ -23,7 +23,10 @@ import { registerPickButtons } from './events/2_3_1_3__registerPickButtons'
 import { registerProductImpression } from './events/3_1__productImpression'
 import { setupProductClickCapture } from './events/productSummary'
 import { fetchCatalogProduct } from './events/3_1__productImpression/catalog'
-import { productClick } from './events/3_2__productClick'
+import {
+    productClick,
+    setupSearchAutocompleteProductClick,
+} from './events/3_2__productClick'
 import { productDetail } from './events/3_3__productDetail'
 import { addToWishlist } from './events/3_4__addToWishlist'
 import { addToCart } from './events/3_5__addToCart'
@@ -68,6 +71,7 @@ const setupDomClickListeners = () => {
 
     document.addEventListener('click', handleDocumentClick)
     setupProductClickCapture()
+    setupSearchAutocompleteProductClick()
     domClickListenerAttached = true
 }
 
@@ -163,6 +167,7 @@ if (canUseDOM) {
     window.addEventListener('message', handleEvents)
     setupDomClickListeners()
     setupProductClickCapture()
+    setupSearchAutocompleteProductClick()
 
     // 2.3.1.1 Register Login Modal
     registerLoginModal()
