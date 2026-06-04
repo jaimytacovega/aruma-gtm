@@ -32,6 +32,36 @@
     return (categories ?? []).map((category) => category.replace(/^\/|\/$/g, ''))
   }
 
+  const clusterLabelIncludesMagentaPoints = (clusters) => {
+    if (!clusters || typeof clusters !== 'object') {
+      return false
+    }
+
+    return Object.values(clusters).some((label) =>
+      String(label).toLowerCase().includes('magenta points')
+    )
+  }
+
+  const isMagentaPointsProduct = (catalog) => {
+    if (!catalog) {
+      return false
+    }
+
+    const inMagentaCategory = parseCategoryParts(catalog.categories).some(
+      (part) => part.trim().toLowerCase() === 'magenta points'
+    )
+
+    if (inMagentaCategory) {
+      return true
+    }
+
+    return (
+      clusterLabelIncludesMagentaPoints(catalog.productClusters) ||
+      clusterLabelIncludesMagentaPoints(catalog.searchableClusters) ||
+      clusterLabelIncludesMagentaPoints(catalog.clusterHighlights)
+    )
+  }
+
   const readSpecification = (product, ...names) => {
     if (!product) {
       return ''
@@ -134,6 +164,14 @@
       listPrice > sellingPrice
         ? Number((listPrice - sellingPrice).toFixed(2))
         : 0
+    const isMagentaPoints = isMagentaPointsProduct(catalog)
+    const magentaPointsPrice = isMagentaPoints
+      ? Number(sellingPrice.toFixed(2))
+      : 0
+    const itemPrice = isMagentaPoints
+      ? 0
+      : Number((sellingPrice + discount).toFixed(2))
+    const itemDiscount = isMagentaPoints ? 0 : discount
     const skuName = catalog?.items?.[0]?.name ?? ''
 
     return {
@@ -144,7 +182,7 @@
         categoryParts[0] ||
         NOT_AVAILABLE,
       coupon: NOT_AVAILABLE,
-      discount,
+      discount: itemDiscount,
       index: visible.index,
       item_brand: catalog?.brand ?? visible.brand,
       item_category:
@@ -206,8 +244,8 @@
           'Frecuencia',
           'Frecuency'
         ) || NOT_AVAILABLE,
-      price: sellingPrice,
-      magentaPoints_price: 0,
+      price: itemPrice,
+      magentaPoints_price: magentaPointsPrice,
       quantity: visible.quantity,
     }
   }

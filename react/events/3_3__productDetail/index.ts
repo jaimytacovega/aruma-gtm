@@ -54,6 +54,7 @@ const productDetail = async (data: ProductViewData) => {
             brand: data.product.brand || '',
             price,
             listPrice,
+            categories: data.product.categories,
             index: 1,
             listId,
             listName,

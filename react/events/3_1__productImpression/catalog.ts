@@ -119,6 +119,7 @@ type VisibleSnapshot = {
   brand: string
   price: number
   listPrice?: number
+  categories?: string[]
   index: number
   listId: string
   listName: string
@@ -144,6 +145,48 @@ const parseCategoryParts = (categories: string[] | undefined): string[] => {
   }
 
   return (categories ?? []).map((category) => category.replace(/^\/|\/$/g, ''))
+}
+
+const MAGENTA_POINTS_CATEGORY = 'magenta points'
+
+const clusterLabelIncludesMagentaPoints = (clusters: unknown): boolean => {
+  if (!clusters || typeof clusters !== 'object') {
+    return false
+  }
+
+  return Object.values(clusters as Record<string, unknown>).some((label) =>
+    String(label).toLowerCase().includes('magenta points')
+  )
+}
+
+const categoriesIncludeMagentaPoints = (
+  categories: string[] | undefined
+): boolean =>
+  parseCategoryParts(categories).some(
+    (part) => part.trim().toLowerCase() === MAGENTA_POINTS_CATEGORY
+  )
+
+const isMagentaPointsProduct = (
+  catalog: CatalogProduct | null,
+  categories?: string[]
+): boolean => {
+  if (categoriesIncludeMagentaPoints(categories)) {
+    return true
+  }
+
+  if (!catalog) {
+    return false
+  }
+
+  if (categoriesIncludeMagentaPoints(catalog.categories)) {
+    return true
+  }
+
+  return (
+    clusterLabelIncludesMagentaPoints(catalog.productClusters) ||
+    clusterLabelIncludesMagentaPoints(catalog.searchableClusters) ||
+    clusterLabelIncludesMagentaPoints(catalog.clusterHighlights)
+  )
 }
 
 const readSpecification = (
@@ -302,7 +345,14 @@ export const buildViewItem = (
     listPrice > sellingPrice
       ? Number((listPrice - sellingPrice).toFixed(2))
       : 0
-  const itemPrice = Number((sellingPrice + discount).toFixed(2))
+  const isMagentaPoints = isMagentaPointsProduct(catalog, visible.categories)
+  const magentaPointsPrice = isMagentaPoints
+    ? Number(sellingPrice.toFixed(2))
+    : 0
+  const itemPrice = isMagentaPoints
+    ? 0
+    : Number((sellingPrice + discount).toFixed(2))
+  const itemDiscount = isMagentaPoints ? 0 : discount
   const skuName = catalog?.items?.[0]?.name ?? ''
 
   return {
@@ -313,7 +363,7 @@ export const buildViewItem = (
       categoryParts[0] ||
       NOT_AVAILABLE,
     coupon: NOT_AVAILABLE,
-    discount,
+    discount: itemDiscount,
     index: visible.index,
     item_brand: catalog?.brand ?? visible.brand,
     item_category:
@@ -361,7 +411,7 @@ export const buildViewItem = (
       'Frecuency'
     ) || NOT_AVAILABLE,
     price: itemPrice,
-    magentaPoints_price: 0,
+    magentaPoints_price: magentaPointsPrice,
     quantity: 1,
   }
 }
