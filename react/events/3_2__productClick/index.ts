@@ -6,6 +6,7 @@ import {
   buildViewItem,
   fetchCatalogProduct,
 } from '../3_1__productImpression/catalog'
+import { resolveProductListFromDom } from '../productSummary'
 const getPriceFromProduct = (product: ProductSummary): number =>
   product.sku?.seller?.commertialOffer?.Price ??
   product.sku?.sellers?.[0]?.commertialOffer?.Price ??
@@ -18,14 +19,15 @@ const productClick = async (data: ProductClickData) => {
     return
   }
 
-  const listName = data.list || 'List of products'
-  const listId = data.list || 'listing'
+  const domList = resolveProductListFromDom(slug)
+  const listId = domList?.listId ?? data.list ?? 'listing'
+  const listName = domList?.listName ?? data.list ?? 'List of products'
   const product = {
     slug,
     name: data.product.productName || slug,
     brand: data.product.brand || '',
     price: getPriceFromProduct(data.product),
-    index: data.position ?? 0,
+    index: domList?.index ?? data.position ?? 0,
     listId,
     listName,
   }
@@ -42,7 +44,7 @@ const productClick = async (data: ProductClickData) => {
   const item = buildViewItem(product, catalog)
   const payload = buildSelectItemPayload(item)
 
-  pushToDataLayer(payload, true)
+  pushToDataLayer(payload)
 }
 
 export { productClick }

@@ -21,6 +21,7 @@ import { registerLoginModal } from './events/2_3_1_1__registerLoginModal'
 import { registerRecoverPassword } from './events/2_3_1_2__registerRecoverPassword'
 import { registerPickButtons } from './events/2_3_1_3__registerPickButtons'
 import { registerProductImpression } from './events/3_1__productImpression'
+import { setupProductClickCapture } from './events/productSummary'
 import { fetchCatalogProduct } from './events/3_1__productImpression/catalog'
 import { productClick } from './events/3_2__productClick'
 import { productDetail } from './events/3_3__productDetail'
@@ -66,6 +67,7 @@ const setupDomClickListeners = () => {
     }
 
     document.addEventListener('click', handleDocumentClick)
+    setupProductClickCapture()
     domClickListenerAttached = true
 }
 
@@ -160,6 +162,7 @@ export const handleEvents = (e: PixelMessage) => {
 if (canUseDOM) {
     window.addEventListener('message', handleEvents)
     setupDomClickListeners()
+    setupProductClickCapture()
 
     // 2.3.1.1 Register Login Modal
     registerLoginModal()

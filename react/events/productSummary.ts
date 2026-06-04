@@ -4,6 +4,17 @@ const PRODUCT_SUMMARY_SELECTOR =
 const normalizeText = (value: string | null | undefined): string =>
   value?.replace(/\s+/g, ' ').trim() || ''
 
+const normalizeSlug = (value: string): string => {
+  try {
+    return decodeURIComponent(value).trim().toLowerCase()
+  } catch {
+    return value.trim().toLowerCase()
+  }
+}
+
+let lastClickedProductCard: HTMLElement | null = null
+let productClickCaptureAttached = false
+
 const parsePrice = (value: string): number => {
   const cleaned = value.replace(/[^\d.,]/g, '').replace(',', '.')
 
@@ -276,6 +287,84 @@ export const getProductCardFromTarget = (target: Element): HTMLElement | null =>
   const productEl = link.closest(PRODUCT_SUMMARY_SELECTOR)
 
   return productEl instanceof HTMLElement ? productEl : null
+}
+
+export const captureProductClickTarget = (target: Element): void => {
+  const card = getProductCardFromTarget(target)
+
+  if (card) {
+    lastClickedProductCard = card
+  }
+}
+
+const listContextFromCard = (
+  card: HTMLElement,
+  slug: string
+): Pick<VisibleProduct, 'listId' | 'listName' | 'index'> | null => {
+  const visible = buildVisibleProduct(card)
+
+  if (!visible || normalizeSlug(visible.slug) !== normalizeSlug(slug)) {
+    return null
+  }
+
+  return {
+    listId: visible.listId,
+    listName: visible.listName,
+    index: visible.index,
+  }
+}
+
+/** Resolve list metadata from the clicked shelf/gallery (vtex:productClick list is often wrong). */
+export const resolveProductListFromDom = (
+  slug: string
+): Pick<VisibleProduct, 'listId' | 'listName' | 'index'> | null => {
+  if (lastClickedProductCard) {
+    const fromClick = listContextFromCard(lastClickedProductCard, slug)
+
+    if (fromClick) {
+      return fromClick
+    }
+  }
+
+  const links = Array.from(document.querySelectorAll('a[href*="/p"]'))
+
+  for (const link of links) {
+    if (!(link instanceof HTMLAnchorElement)) {
+      continue
+    }
+
+    const card = link.closest(PRODUCT_SUMMARY_SELECTOR)
+
+    if (!(card instanceof HTMLElement)) {
+      continue
+    }
+
+    const fromCard = listContextFromCard(card, slug)
+
+    if (fromCard) {
+      return fromCard
+    }
+  }
+
+  return null
+}
+
+/** Capture phase so the card is stored before vtex:productClick runs. */
+export const setupProductClickCapture = (): void => {
+  if (productClickCaptureAttached || typeof document === 'undefined') {
+    return
+  }
+
+  document.addEventListener(
+    'click',
+    (event) => {
+      if (event.target instanceof Element) {
+        captureProductClickTarget(event.target)
+      }
+    },
+    true
+  )
+  productClickCaptureAttached = true
 }
 
 export { PRODUCT_SUMMARY_SELECTOR }
