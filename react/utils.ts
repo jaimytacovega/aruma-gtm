@@ -12,6 +12,115 @@ const LOGIN_MODAL_INTERACTION_SELECTOR = [
 const isInsideLoginModalInteraction = (target: Element): boolean =>
     Boolean(target.closest(LOGIN_MODAL_INTERACTION_SELECTOR))
 
+type ProductListContext = {
+    listId: string
+    listName: string
+}
+
+const normalizeProductKey = (value: string): string => {
+    try {
+        return decodeURIComponent(value).trim().toLowerCase()
+    } catch {
+        return value.trim().toLowerCase()
+    }
+}
+
+const selectItemMatchesProduct = (
+    entry: Record<string, unknown>,
+    slug: string,
+    productId?: string
+): boolean => {
+    const ecommerce = entry.ecommerce as Record<string, unknown> | undefined
+    const items = ecommerce?.items
+
+    if (!Array.isArray(items)) {
+        return false
+    }
+
+    const slugKey = normalizeProductKey(slug)
+    const productIdKey = productId
+        ? normalizeProductKey(String(productId))
+        : ''
+
+    for (const raw of items) {
+        if (!raw || typeof raw !== 'object') {
+            continue
+        }
+
+        const item = raw as Record<string, unknown>
+        const itemId = normalizeProductKey(String(item.item_id ?? ''))
+
+        if (itemId === slugKey || (productIdKey && itemId === productIdKey)) {
+            return true
+        }
+    }
+
+    return false
+}
+
+const readSelectItemList = (
+    entry: Record<string, unknown>
+): ProductListContext | null => {
+    const ecommerce = entry.ecommerce as Record<string, unknown> | undefined
+
+    if (!ecommerce) {
+        return null
+    }
+
+    const listName = String(ecommerce.item_list_name ?? '').trim()
+    const listId = String(ecommerce.item_list_id ?? listName).trim()
+
+    if (!listName && !listId) {
+        return null
+    }
+
+    return {
+        listId: listId || listName,
+        listName: listName || listId,
+    }
+}
+
+/** PDP list context: last select_item for this product, else last select_item, else fallback. */
+const getListFromLastSelectItem = (
+    slug: string,
+    productId?: string,
+    fallback: ProductListContext = {
+        listId: NOT_AVAILABLE,
+        listName: NOT_AVAILABLE,
+    }
+): ProductListContext => {
+    if (!canUseDOM) {
+        return fallback
+    }
+
+    window.dataLayer = window.dataLayer || []
+    let lastSelectItemList: ProductListContext | null = null
+
+    for (let index = window.dataLayer.length - 1; index >= 0; index -= 1) {
+        const entry = window.dataLayer[index]
+
+        if (!entry || entry.event !== 'select_item') {
+            continue
+        }
+
+        const list = readSelectItemList(entry)
+
+        if (!list) {
+            continue
+        }
+
+        if (!lastSelectItemList) {
+            lastSelectItemList = list
+        }
+
+        if (selectItemMatchesProduct(entry, slug, productId)) {
+            return list
+        }
+    }
+
+    return lastSelectItemList ?? fallback
+}
+
 const pushToDataLayer = (payload: Record<string, unknown>, disableLog: boolean = false) => {
     if (!canUseDOM) {
         return
@@ -26,6 +135,7 @@ const pushToDataLayer = (payload: Record<string, unknown>, disableLog: boolean =
 
 export {
     pushToDataLayer,
+    getListFromLastSelectItem,
     log,
     isInsideLoginModalInteraction,
     NOT_AVAILABLE,

@@ -118,6 +118,7 @@ type VisibleSnapshot = {
   name: string
   brand: string
   price: number
+  listPrice?: number
   index: number
   listId: string
   listName: string
@@ -295,12 +296,13 @@ export const buildViewItem = (
 ): ViewItem => {
   const categoryParts = parseCategoryParts(catalog?.categories)
   const offer = getCommercialOffer(catalog)
-  const listPrice = offer?.ListPrice ?? visible.price
+  const listPrice = offer?.ListPrice ?? visible.listPrice ?? visible.price
   const sellingPrice = offer?.Price ?? visible.price
   const discount =
     listPrice > sellingPrice
       ? Number((listPrice - sellingPrice).toFixed(2))
       : 0
+  const itemPrice = Number((sellingPrice + discount).toFixed(2))
   const skuName = catalog?.items?.[0]?.name ?? ''
 
   return {
@@ -358,11 +360,14 @@ export const buildViewItem = (
       'Frecuencia',
       'Frecuency'
     ) || NOT_AVAILABLE,
-    price: sellingPrice,
+    price: itemPrice,
     magentaPoints_price: 0,
     quantity: 1,
   }
 }
+
+const getItemNetValue = (item: ViewItem): number =>
+  Number(((item.price - item.discount) * item.quantity).toFixed(2))
 
 export const buildViewItemListPayload = (
   items: ViewItem[],
@@ -393,14 +398,14 @@ export const buildViewItemPayload = (
   event: 'view_item',
   ecommerce: {
     currency,
-    value: Number((item.price * item.quantity).toFixed(2)),
+    value: getItemNetValue(item),
     magentaPoints_value: item.magentaPoints_price * item.quantity,
     items: [item],
   },
 })
 
 const buildCartEcommerce = (items: ViewItem[], currency: string) => {
-  const value = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const value = items.reduce((sum, item) => sum + getItemNetValue(item), 0)
   const magentaPoints_value = items.reduce(
     (sum, item) => sum + item.magentaPoints_price * item.quantity,
     0
