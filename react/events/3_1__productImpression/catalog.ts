@@ -239,13 +239,11 @@ export const fetchCatalogProduct = async (
   const cached = catalogCache.get(catalogSlug)
 
   if (cached) {
-    log('catalog cached', cached)
     return cached
   }
 
   const request = (async () => {
     try {
-      log('slug', catalogSlug)
       const response = await fetch(
         `/api/catalog_system/pub/products/search/${encodeURIComponent(catalogSlug)}`,
         { credentials: 'same-origin' }
@@ -258,7 +256,6 @@ export const fetchCatalogProduct = async (
       }
 
       const data = (await response.json()) as CatalogProduct[]
-      log('catalog data', data)
 
       if (!Array.isArray(data)) {
         throw new Error(`Catalog response for "${catalogSlug}" was not an array.`)
