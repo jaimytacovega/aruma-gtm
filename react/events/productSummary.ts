@@ -67,6 +67,97 @@ const getListBlockClass = (element: Element | null): string | null => {
   return match?.[1] ?? null
 }
 
+const SECTION_TITLE_SELECTOR = [
+  '[class*="sectionBlockTitle"]',
+  '[class*="paragraph--sectionBlockTitle"]',
+].join(', ')
+
+const SHELF_CONTAINER_SELECTOR = '[class*="sliderLayoutContainer"]'
+
+const SECTION_ROOT_SELECTOR =
+  'section[class*="container"], section[class*="store-components"]'
+
+const SHELF_TITLE_ROW_SELECTOR = '[class*="flexRowContent--title-slider"]'
+
+const readSectionTitle = (container: Element): string => {
+  const titleEl = container.querySelector(SECTION_TITLE_SELECTOR)
+
+  return titleEl ? normalizeText(titleEl.textContent) : ''
+}
+
+/** Closest section title that appears before the shelf within the same VTEX block. */
+const getClosestPrecedingTitleInRoot = (
+  shelf: HTMLElement,
+  root: ParentNode
+): string => {
+  const titles = Array.from(root.querySelectorAll(SECTION_TITLE_SELECTOR))
+  let closest: HTMLElement | null = null
+
+  for (const titleNode of titles) {
+    if (!(titleNode instanceof HTMLElement)) {
+      continue
+    }
+
+    const position = shelf.compareDocumentPosition(titleNode)
+
+    if ((position & Node.DOCUMENT_POSITION_PRECEDING) === 0) {
+      continue
+    }
+
+    if (!closest) {
+      closest = titleNode
+      continue
+    }
+
+    if (
+      (closest.compareDocumentPosition(titleNode) &
+        Node.DOCUMENT_POSITION_FOLLOWING) !==
+      0
+    ) {
+      closest = titleNode
+    }
+  }
+
+  return closest ? normalizeText(closest.textContent) : ''
+}
+
+const getSliderSectionTitle = (shelf: HTMLElement): string => {
+  const sectionRoot = shelf.closest(SECTION_ROOT_SELECTOR)
+
+  if (!sectionRoot) {
+    return getClosestPrecedingTitleInRoot(shelf, document)
+  }
+
+  const titleRow = sectionRoot.querySelector(SHELF_TITLE_ROW_SELECTOR)
+
+  if (titleRow) {
+    const title = readSectionTitle(titleRow)
+
+    if (title) {
+      return title
+    }
+  }
+
+  return getClosestPrecedingTitleInRoot(shelf, sectionRoot)
+}
+
+const getCategoryListContext = (): { listId: string; listName: string } | null => {
+  const heading = document.querySelector(
+    'h1[class*="title"], [class*="galleryTitle"], [class*="pageTitle"]'
+  )
+
+  const title = normalizeText(heading?.textContent)
+
+  if (!title) {
+    return null
+  }
+
+  return {
+    listId: title,
+    listName: title,
+  }
+}
+
 export type VisibleProduct = {
   slug: string
   name: string
@@ -82,14 +173,16 @@ export const getListContext = (productEl: HTMLElement): {
   listName: string
   listRoot: ParentNode
 } => {
-  const shelf = productEl.closest('[class*="sliderLayoutContainer"]')
+  const shelf = productEl.closest(SHELF_CONTAINER_SELECTOR)
 
-  if (shelf) {
+  if (shelf instanceof HTMLElement) {
+    const sectionTitle = getSliderSectionTitle(shelf)
     const blockClass = getListBlockClass(shelf) || 'shelf'
+    const listLabel = sectionTitle || blockClass
 
     return {
-      listId: blockClass,
-      listName: blockClass,
+      listId: listLabel,
+      listName: listLabel,
       listRoot: shelf,
     }
   }
@@ -112,6 +205,21 @@ export const getListContext = (productEl: HTMLElement): {
     }
   }
 
+  const galleryRoot = productEl.closest(
+    '[class*="gallery"], [class*="search-result"], [class*="searchResult"]'
+  )
+
+  if (galleryRoot) {
+    const categoryList = getCategoryListContext()
+
+    if (categoryList) {
+      return {
+        ...categoryList,
+        listRoot: galleryRoot,
+      }
+    }
+  }
+
   return {
     listId: 'listing',
     listName: 'List of products',
@@ -123,8 +231,12 @@ export const getProductIndex = (
   productEl: HTMLElement,
   listRoot: ParentNode
 ): number => {
+  const shelf = productEl.closest(SHELF_CONTAINER_SELECTOR)
+  const scope =
+    shelf instanceof HTMLElement ? shelf : listRoot
+
   const cards = Array.from(
-    listRoot.querySelectorAll(PRODUCT_SUMMARY_SELECTOR)
+    scope.querySelectorAll(PRODUCT_SUMMARY_SELECTOR)
   ).filter((node): node is HTMLElement => node instanceof HTMLElement)
 
   const index = cards.indexOf(productEl)
