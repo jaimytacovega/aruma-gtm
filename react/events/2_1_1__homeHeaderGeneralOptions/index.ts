@@ -8,9 +8,6 @@ type HeaderGeneralOption = {
     matchesClick?: (clickable: HTMLElement) => boolean
 }
 
-const normalizeText = (value: string | null | undefined): string =>
-    value?.replace(/\s+/g, ' ').trim() || ''
-
 const LOGIN_MODAL_UI_SELECTOR = [
     '[class*="aruma-login-0-x-sendButton"]',
     '[class*="aruma-login-0-x-formForgotPassword"]',
@@ -34,14 +31,12 @@ const HEADER_GENERAL_OPTIONS: HeaderGeneralOption[] = [
             '[class*="container_header_login"], [class*="containerHeaderLogin"], [class*="flexCol--header-login"]',
         clickableSelector: 'button',
         matchesClick: isHeaderLoginTrigger,
-        getCta: (_container, clickable) =>
-            normalizeText(clickable.querySelector('p')?.textContent),
+        getCta: () => 'Inicia sesion',
     },
     {
         containerSelector: '[class*="container--storesaruma"]',
         clickableSelector: 'a',
-        getCta: (container) =>
-            normalizeText(container.querySelector('a')?.textContent),
+        getCta: () => 'Encuentra tu tienda',
     },
     {
         containerSelector: '[class*="flexCol--header-magenta-button"]',
