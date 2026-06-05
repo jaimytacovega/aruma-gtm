@@ -239,44 +239,14 @@
       }
     }
 
-    const selectItemMatchesProduct = (entry, slug, productId) => {
-      const items = entry?.ecommerce?.items
+    const CHECKOUT_LIST_CONTEXT_KEY = 'aruma-gtm:checkout-list-context'
 
-      if (!Array.isArray(items)) {
-        return false
-      }
+    const normalizeListContext = (list) => {
+      const value = String(list?.listName || list?.listId || '').trim()
 
-      const slugKey = normalizeProductKey(slug)
-      const productIdKey = productId
-        ? normalizeProductKey(String(productId))
-        : ''
-
-      return items.some((raw) => {
-        if (!raw || typeof raw !== 'object') {
-          return false
-        }
-
-        const itemId = normalizeProductKey(String(raw.item_id ?? ''))
-
-        return itemId === slugKey || (productIdKey && itemId === productIdKey)
-      })
-    }
-
-    const readSelectItemList = (entry) => {
-      const ecommerce = entry?.ecommerce
-
-      if (!ecommerce) {
+      if (!value) {
         return null
       }
-
-      const listName = String(ecommerce.item_list_name ?? '').trim()
-      const listId = String(ecommerce.item_list_id ?? listName).trim()
-
-      if (!listName && !listId) {
-        return null
-      }
-
-      const value = listName || listId
 
       return {
         listId: value,
@@ -284,24 +254,18 @@
       }
     }
 
-    const readSelectItemHistory = () => {
-      let stored = []
-
+    const readCheckoutListStore = () => {
       try {
-        const raw = global.sessionStorage?.getItem('aruma-gtm:select-items')
+        const raw = global.localStorage?.getItem(CHECKOUT_LIST_CONTEXT_KEY)
 
         if (raw) {
-          stored = JSON.parse(raw)
+          return JSON.parse(raw)
         }
       } catch {
-        stored = []
+        // localStorage unavailable or corrupt
       }
 
-      const current = (global.dataLayer || []).filter(
-        (entry) => entry?.event === 'select_item'
-      )
-
-      return [...stored, ...current]
+      return { last: null, byProduct: {} }
     }
 
     const getListFromLastSelectItem = (slug, productId) => {
@@ -310,32 +274,33 @@
         listName: NOT_AVAILABLE,
       }
 
-      const history = readSelectItemHistory()
-      let lastSelectItemList = null
+      const store = readCheckoutListStore()
+      const slugKey = normalizeProductKey(slug)
+      const productIdKey = productId
+        ? normalizeProductKey(String(productId))
+        : ''
 
-      for (let index = history.length - 1; index >= 0; index -= 1) {
-        const entry = history[index]
-
-        if (!entry || entry.event !== 'select_item') {
-          continue
-        }
-
-        const list = readSelectItemList(entry)
-
-        if (!list) {
-          continue
-        }
-
-        if (!lastSelectItemList) {
-          lastSelectItemList = list
-        }
-
-        if (selectItemMatchesProduct(entry, slug, productId)) {
-          return list
-        }
+      if (slugKey && store.byProduct?.[slugKey]) {
+        return normalizeListContext(store.byProduct[slugKey]) ?? fallback
       }
 
-      return lastSelectItemList ?? fallback
+      if (productIdKey && store.byProduct?.[productIdKey]) {
+        return normalizeListContext(store.byProduct[productIdKey]) ?? fallback
+      }
+
+      if (store.last) {
+        return normalizeListContext(store.last) ?? fallback
+      }
+
+      return fallback
+    }
+
+    const clearCheckoutListContext = () => {
+      try {
+        global.localStorage?.removeItem(CHECKOUT_LIST_CONTEXT_KEY)
+      } catch {
+        // localStorage unavailable
+      }
     }
 
     const getListContextForOrderItem = (orderItem) => {
@@ -363,6 +328,7 @@
       getSlugFromDetailUrl,
       getListFromLastSelectItem,
       getListContextForOrderItem,
+      clearCheckoutListContext,
     }
   }
 })(window)

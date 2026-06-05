@@ -164,26 +164,8 @@
     console.info('[aruma-gtm]', ...args)
   }
 
-  const persistSelectItem = (payload) => {
-    if (payload.event !== 'select_item') {
-      return
-    }
-
-    try {
-      const key = 'aruma-gtm:select-items'
-      const raw = window.sessionStorage.getItem(key)
-      const history = raw ? JSON.parse(raw) : []
-
-      history.push(payload)
-      window.sessionStorage.setItem(key, JSON.stringify(history.slice(-30)))
-    } catch {
-      // sessionStorage unavailable or full
-    }
-  }
-
   const pushToDataLayer = (payload) => {
     window.dataLayer.push(payload)
-    persistSelectItem(payload)
     log(JSON.stringify(payload))
   }
 
@@ -332,6 +314,7 @@
     }
 
     log('syncOrderPlacedEvents', window.location.href)
+    orderFormUtils.clearCheckoutListContext()
     successPaymentScreening.sync()
     successPayment.sync()
   }
