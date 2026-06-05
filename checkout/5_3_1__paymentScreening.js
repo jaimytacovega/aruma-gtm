@@ -26,6 +26,9 @@
       }
     }
 
+    const getPaymentPageLocation = () =>
+      `${global.location.origin}/checkout/pago`
+
     const pushPaymentScreeningVirtualPage = () => {
       if (!isCheckoutPaymentPage()) {
         return
@@ -33,7 +36,7 @@
 
       ensurePriorCheckoutScreens()
 
-      const pageUrl = global.location.href
+      const pageUrl = getPaymentPageLocation()
 
       if (pageUrl === lastVirtualPageUrl) {
         return
