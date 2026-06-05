@@ -34,23 +34,18 @@
   global.create5_1_1__checkoutScreening = ({ pushToDataLayer }) => {
     let lastVirtualPageUrl = ''
 
-    const buildIdentificationVirtualPagePayload = (pageUrl) => ({
+    const getIdentificationPageLocation = () =>
+      `${global.location.origin}/checkout/identificacion`
+
+    const buildIdentificationVirtualPagePayload = () => ({
       event: 'virtualPage',
-      page_location: pageUrl,
+      page_location: getIdentificationPageLocation(),
       page_title: IDENTIFICATION_PAGE_TITLE,
       checkout_screen: IDENTIFICATION_CHECKOUT_SCREEN,
     })
 
-    const getIdentificationBackfillLocation = () => {
-      if (isCheckoutScreeningPage()) {
-        return global.location.href
-      }
-
-      return `${global.location.origin}${global.location.pathname}#/profile`
-    }
-
-    const pushIdentificationVirtualPage = (pageUrl) => {
-      pushToDataLayer(buildIdentificationVirtualPagePayload(pageUrl))
+    const pushIdentificationVirtualPage = () => {
+      pushToDataLayer(buildIdentificationVirtualPagePayload())
     }
 
     const ensureIdentificationVirtualPage = () => {
@@ -58,7 +53,7 @@
         return false
       }
 
-      pushIdentificationVirtualPage(getIdentificationBackfillLocation())
+      pushIdentificationVirtualPage()
 
       return true
     }
@@ -68,7 +63,7 @@
         return
       }
 
-      const pageUrl = global.location.href
+      const pageUrl = getIdentificationPageLocation()
 
       if (pageUrl === lastVirtualPageUrl) {
         return
@@ -76,7 +71,7 @@
 
       lastVirtualPageUrl = pageUrl
 
-      pushIdentificationVirtualPage(pageUrl)
+      pushIdentificationVirtualPage()
     }
 
     const onHashChange = () => {
