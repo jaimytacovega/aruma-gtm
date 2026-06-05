@@ -31,23 +31,18 @@
   }) => {
     let lastVirtualPageUrl = ''
 
-    const buildShippingVirtualPagePayload = (pageUrl) => ({
+    const getShippingPageLocation = () =>
+      `${global.location.origin}/checkout/envio`
+
+    const buildShippingVirtualPagePayload = () => ({
       event: 'virtualPage',
-      page_location: pageUrl,
+      page_location: getShippingPageLocation(),
       page_title: SHIPPING_PAGE_TITLE,
       checkout_screen: SHIPPING_CHECKOUT_SCREEN,
     })
 
-    const getShippingBackfillLocation = () => {
-      if (isCheckoutShippingPage()) {
-        return global.location.href
-      }
-
-      return `${global.location.origin}${global.location.pathname}#/shipping`
-    }
-
-    const pushShippingVirtualPage = (pageUrl) => {
-      pushToDataLayer(buildShippingVirtualPagePayload(pageUrl))
+    const pushShippingVirtualPage = () => {
+      pushToDataLayer(buildShippingVirtualPagePayload())
     }
 
     const ensureShippingVirtualPage = () => {
@@ -59,7 +54,7 @@
         ensureCheckoutScreening()
       }
 
-      pushShippingVirtualPage(getShippingBackfillLocation())
+      pushShippingVirtualPage()
 
       return true
     }
@@ -73,7 +68,7 @@
         ensureCheckoutScreening()
       }
 
-      const pageUrl = global.location.href
+      const pageUrl = getShippingPageLocation()
 
       if (pageUrl === lastVirtualPageUrl) {
         return
@@ -81,7 +76,7 @@
 
       lastVirtualPageUrl = pageUrl
 
-      pushShippingVirtualPage(pageUrl)
+      pushShippingVirtualPage()
     }
 
     const onHashChange = () => {
