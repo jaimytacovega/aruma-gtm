@@ -121,6 +121,28 @@ const getListFromLastSelectItem = (
     return lastSelectItemList ?? fallback
 }
 
+const SELECT_ITEM_HISTORY_KEY = 'aruma-gtm:select-items'
+const SELECT_ITEM_HISTORY_LIMIT = 30
+
+const persistSelectItem = (payload: Record<string, unknown>) => {
+    if (payload.event !== 'select_item') {
+        return
+    }
+
+    try {
+        const raw = window.sessionStorage.getItem(SELECT_ITEM_HISTORY_KEY)
+        const history = raw ? (JSON.parse(raw) as Record<string, unknown>[]) : []
+
+        history.push(payload)
+        window.sessionStorage.setItem(
+            SELECT_ITEM_HISTORY_KEY,
+            JSON.stringify(history.slice(-SELECT_ITEM_HISTORY_LIMIT))
+        )
+    } catch {
+        // sessionStorage unavailable or full
+    }
+}
+
 const pushToDataLayer = (payload: Record<string, unknown>, disableLog: boolean = false) => {
     if (!canUseDOM) {
         return
@@ -128,6 +150,7 @@ const pushToDataLayer = (payload: Record<string, unknown>, disableLog: boolean =
 
     window.dataLayer = window.dataLayer || []
     window.dataLayer.push(payload)
+    persistSelectItem(payload)
     if (!disableLog) {
         log(JSON.stringify(payload))
     }

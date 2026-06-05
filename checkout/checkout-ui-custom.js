@@ -9,19 +9,21 @@
  * 2. checkout/5_1_1__checkoutScreening.js
  * 3. checkout/checkoutCartItems.js
  * 4. checkout/checkoutOrderFormUtils.js
- * 5. checkout/4_1__cartImpression.js
- * 6. checkout/5_1_2__startCheckout.js
- * 7. checkout/5_1_3__companyInfo.js
- * 8. checkout/5_1_4__submitCompanyInfo.js
- * 9. checkout/5_2_1__shippingScreening.js
- * 10. checkout/5_2_2__submitShipping.js
- * 11. checkout/5_2_3__shippingPickButton.js
- * 12. checkout/5_3_1__paymentScreening.js
- * 13. checkout/5_3_2__paymentInfo.js
- * 14. checkout/5_3_3__paymentPickButton.js
- * 15. checkout/5_4_1__successPaymentScreening.js
- * 16. checkout/5_4_2__successPayment.js
- * 17. This file
+ * 5. checkout/3_5__addToCart.js
+ * 6. checkout/4_2__removeFromCart.js
+ * 7. checkout/4_1__cartImpression.js
+ * 8. checkout/5_1_2__startCheckout.js
+ * 9. checkout/5_1_3__companyInfo.js
+ * 10. checkout/5_1_4__submitCompanyInfo.js
+ * 11. checkout/5_2_1__shippingScreening.js
+ * 12. checkout/5_2_2__submitShipping.js
+ * 13. checkout/5_2_3__shippingPickButton.js
+ * 14. checkout/5_3_1__paymentScreening.js
+ * 15. checkout/5_3_2__paymentInfo.js
+ * 16. checkout/5_3_3__paymentPickButton.js
+ * 17. checkout/5_4_1__successPaymentScreening.js
+ * 18. checkout/5_4_2__successPayment.js
+ * 19. This file
  */
 ;(() => {
   if (window.__arumaGtmCheckoutInitialized) {
@@ -52,6 +54,20 @@
   if (typeof window.createCheckoutOrderFormUtils !== 'function') {
     console.error(
       '[aruma-gtm] Missing createCheckoutOrderFormUtils. Paste checkout/checkoutOrderFormUtils.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create3_5__addToCart !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create3_5__addToCart. Paste checkout/3_5__addToCart.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create4_2__removeFromCart !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create4_2__removeFromCart. Paste checkout/4_2__removeFromCart.js first.'
     )
     return
   }
@@ -148,8 +164,26 @@
     console.info('[aruma-gtm]', ...args)
   }
 
+  const persistSelectItem = (payload) => {
+    if (payload.event !== 'select_item') {
+      return
+    }
+
+    try {
+      const key = 'aruma-gtm:select-items'
+      const raw = window.sessionStorage.getItem(key)
+      const history = raw ? JSON.parse(raw) : []
+
+      history.push(payload)
+      window.sessionStorage.setItem(key, JSON.stringify(history.slice(-30)))
+    } catch {
+      // sessionStorage unavailable or full
+    }
+  }
+
   const pushToDataLayer = (payload) => {
     window.dataLayer.push(payload)
+    persistSelectItem(payload)
     log(JSON.stringify(payload))
   }
 
@@ -209,6 +243,20 @@
   })
 
   const cartImpression = window.create4_1__cartImpression({
+    pushToDataLayer,
+    enrichOrderFormItems,
+    orderFormUtils,
+  })
+
+  const addToCart = window.create3_5__addToCart({
+    isCheckoutCartPage,
+    pushToDataLayer,
+    enrichOrderFormItems,
+    orderFormUtils,
+  })
+
+  const removeFromCart = window.create4_2__removeFromCart({
+    isCheckoutCartPage,
     pushToDataLayer,
     enrichOrderFormItems,
     orderFormUtils,
@@ -311,6 +359,8 @@
   const init = () => {
     pushAnalyticsLoaded()
     cartImpression()
+    addToCart()
+    removeFromCart()
     checkoutScreening.attach()
     startCheckout()
     companyInfo()

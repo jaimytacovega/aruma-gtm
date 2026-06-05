@@ -218,6 +218,134 @@
       }
     }
 
+    const getSlugFromDetailUrl = (detailUrl) => {
+      if (!detailUrl) {
+        return ''
+      }
+
+      const path = detailUrl.startsWith('http')
+        ? new URL(detailUrl, global.location.origin).pathname
+        : detailUrl
+      const match = path.match(/\/([^/]+)\/p\/?$/)
+
+      return match?.[1] ?? ''
+    }
+
+    const normalizeProductKey = (value) => {
+      try {
+        return decodeURIComponent(value).trim().toLowerCase()
+      } catch {
+        return String(value).trim().toLowerCase()
+      }
+    }
+
+    const selectItemMatchesProduct = (entry, slug, productId) => {
+      const items = entry?.ecommerce?.items
+
+      if (!Array.isArray(items)) {
+        return false
+      }
+
+      const slugKey = normalizeProductKey(slug)
+      const productIdKey = productId
+        ? normalizeProductKey(String(productId))
+        : ''
+
+      return items.some((raw) => {
+        if (!raw || typeof raw !== 'object') {
+          return false
+        }
+
+        const itemId = normalizeProductKey(String(raw.item_id ?? ''))
+
+        return itemId === slugKey || (productIdKey && itemId === productIdKey)
+      })
+    }
+
+    const readSelectItemList = (entry) => {
+      const ecommerce = entry?.ecommerce
+
+      if (!ecommerce) {
+        return null
+      }
+
+      const listName = String(ecommerce.item_list_name ?? '').trim()
+      const listId = String(ecommerce.item_list_id ?? listName).trim()
+
+      if (!listName && !listId) {
+        return null
+      }
+
+      const value = listName || listId
+
+      return {
+        listId: value,
+        listName: value,
+      }
+    }
+
+    const readSelectItemHistory = () => {
+      let stored = []
+
+      try {
+        const raw = global.sessionStorage?.getItem('aruma-gtm:select-items')
+
+        if (raw) {
+          stored = JSON.parse(raw)
+        }
+      } catch {
+        stored = []
+      }
+
+      const current = (global.dataLayer || []).filter(
+        (entry) => entry?.event === 'select_item'
+      )
+
+      return [...stored, ...current]
+    }
+
+    const getListFromLastSelectItem = (slug, productId) => {
+      const fallback = {
+        listId: NOT_AVAILABLE,
+        listName: NOT_AVAILABLE,
+      }
+
+      const history = readSelectItemHistory()
+      let lastSelectItemList = null
+
+      for (let index = history.length - 1; index >= 0; index -= 1) {
+        const entry = history[index]
+
+        if (!entry || entry.event !== 'select_item') {
+          continue
+        }
+
+        const list = readSelectItemList(entry)
+
+        if (!list) {
+          continue
+        }
+
+        if (!lastSelectItemList) {
+          lastSelectItemList = list
+        }
+
+        if (selectItemMatchesProduct(entry, slug, productId)) {
+          return list
+        }
+      }
+
+      return lastSelectItemList ?? fallback
+    }
+
+    const getListContextForOrderItem = (orderItem) => {
+      const slug =
+        getSlugFromDetailUrl(orderItem?.detailUrl) ||
+        String(orderItem?.productId ?? '')
+
+      return getListFromLastSelectItem(slug, orderItem?.productId)
+    }
+
     return {
       isCheckoutPaymentPage,
       isCheckoutOrderPlacedPage,
@@ -232,6 +360,9 @@
       getTax: (orderForm) => getTotalizerValue(orderForm, 'Tax'),
       getShipping: (orderForm) => getTotalizerValue(orderForm, 'Shipping'),
       buildItemsEcommerceTotals,
+      getSlugFromDetailUrl,
+      getListFromLastSelectItem,
+      getListContextForOrderItem,
     }
   }
 })(window)
