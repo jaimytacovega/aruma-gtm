@@ -9,18 +9,19 @@
  * 2. checkout/5_1_1__checkoutScreening.js
  * 3. checkout/checkoutCartItems.js
  * 4. checkout/checkoutOrderFormUtils.js
- * 5. checkout/5_1_2__startCheckout.js
- * 6. checkout/5_1_3__companyInfo.js
- * 7. checkout/5_1_4__submitCompanyInfo.js
- * 8. checkout/5_2_1__shippingScreening.js
- * 9. checkout/5_2_2__submitShipping.js
- * 10. checkout/5_2_3__shippingPickButton.js
- * 11. checkout/5_3_1__paymentScreening.js
- * 12. checkout/5_3_2__paymentInfo.js
- * 13. checkout/5_3_3__paymentPickButton.js
- * 14. checkout/5_4_1__successPaymentScreening.js
- * 15. checkout/5_4_2__successPayment.js
- * 16. This file
+ * 5. checkout/4_1__cartImpression.js
+ * 6. checkout/5_1_2__startCheckout.js
+ * 7. checkout/5_1_3__companyInfo.js
+ * 8. checkout/5_1_4__submitCompanyInfo.js
+ * 9. checkout/5_2_1__shippingScreening.js
+ * 10. checkout/5_2_2__submitShipping.js
+ * 11. checkout/5_2_3__shippingPickButton.js
+ * 12. checkout/5_3_1__paymentScreening.js
+ * 13. checkout/5_3_2__paymentInfo.js
+ * 14. checkout/5_3_3__paymentPickButton.js
+ * 15. checkout/5_4_1__successPaymentScreening.js
+ * 16. checkout/5_4_2__successPayment.js
+ * 17. This file
  */
 ;(() => {
   if (window.__arumaGtmCheckoutInitialized) {
@@ -51,6 +52,13 @@
   if (typeof window.createCheckoutOrderFormUtils !== 'function') {
     console.error(
       '[aruma-gtm] Missing createCheckoutOrderFormUtils. Paste checkout/checkoutOrderFormUtils.js first.'
+    )
+    return
+  }
+
+  if (typeof window.create4_1__cartImpression !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing create4_1__cartImpression. Paste checkout/4_1__cartImpression.js first.'
     )
     return
   }
@@ -200,6 +208,12 @@
     pushToDataLayer,
   })
 
+  const cartImpression = window.create4_1__cartImpression({
+    pushToDataLayer,
+    enrichOrderFormItems,
+    orderFormUtils,
+  })
+
   const startCheckout = window.create5_1_2__startCheckout({
     pushToDataLayer,
     enrichOrderFormItems,
@@ -296,6 +310,7 @@
 
   const init = () => {
     pushAnalyticsLoaded()
+    cartImpression()
     checkoutScreening.attach()
     startCheckout()
     companyInfo()

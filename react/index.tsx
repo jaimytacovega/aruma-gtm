@@ -140,13 +140,13 @@ export const handleEvents = (e: PixelMessage) => {
             break
         }
 
-        case 'vtex:viewCart': {
-            const data = e.data as ViewCartData
+        // // Uncomment when minicart is part of markins
+        // case 'vtex:viewCart': {
+        //     const data = e.data as ViewCartData
 
-            // TODO: 4.1 Only on storefront minicart
-            cartImpression(data)
-            break
-        }
+        //     cartImpression(data)
+        //     break
+        // }
 
         case 'vtex:removeFromCart': {
             const data = e.data as RemoveToCartData

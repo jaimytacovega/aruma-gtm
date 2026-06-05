@@ -202,8 +202,11 @@
       return buildOrderFormFromOrders(orders)
     }
 
+    const getItemNetValue = (item) =>
+      Number(((item.price - item.discount) * item.quantity).toFixed(2))
+
     const buildItemsEcommerceTotals = (items) => {
-      const value = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      const value = items.reduce((sum, item) => sum + getItemNetValue(item), 0)
       const magentaPoints_value = items.reduce(
         (sum, item) => sum + item.magentaPoints_price * item.quantity,
         0
