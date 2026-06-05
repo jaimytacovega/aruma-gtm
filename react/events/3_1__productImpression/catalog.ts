@@ -104,6 +104,16 @@ export type RemoveFromCartPayload = {
   }
 }
 
+export type AddToWishlistPayload = {
+  event: 'add_to_whislist'
+  ecommerce: {
+    currency: string
+    value: number
+    magentaPoints_value: number
+    items: ViewItem[]
+  }
+}
+
 export type SelectItemPayload = {
   event: 'select_item'
   ecommerce: {
@@ -490,5 +500,13 @@ export const buildRemoveFromCartPayload = (
   currency: string
 ): RemoveFromCartPayload => ({
   event: 'remove_from_cart',
+  ecommerce: buildCartEcommerce(items, currency),
+})
+
+export const buildAddToWishlistPayload = (
+  items: ViewItem[],
+  currency: string
+): AddToWishlistPayload => ({
+  event: 'add_to_whislist',
   ecommerce: buildCartEcommerce(items, currency),
 })

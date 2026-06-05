@@ -126,13 +126,12 @@ export const handleEvents = (e: PixelMessage) => {
             break
         }
 
-        // TODO: 3.4 Add to Wishlist - Validate fields
-        // case 'vtex:addToWishlist': {
-        //     const data = e.data as AddToWishlistData
+        case 'vtex:addToWishlist': {
+            const data = e.data as AddToWishlistData
 
-        //     addToWishlist(data)
-        //     break
-        // }
+            addToWishlist(data)
+            break
+        }
 
         case 'vtex:addToCart': {
             const data = e.data as AddToCartData
