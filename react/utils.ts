@@ -227,22 +227,16 @@ let awaitingLoginTimeoutId: number | null = null
 const readAwaitingLoginValue = () => {
     try {
         return window.sessionStorage.getItem(AWAITING_LOGIN_KEY)
-    } catch (error) {
-        log('awaiting-login read failed', error)
+    } catch {
         return null
     }
 }
 
-const setAwaitingLogin = (source: string) => {
+const setAwaitingLogin = () => {
     try {
         window.sessionStorage.setItem(AWAITING_LOGIN_KEY, '1')
-        log('awaiting-login set', {
-            source,
-            key: AWAITING_LOGIN_KEY,
-            value: readAwaitingLoginValue(),
-        })
-    } catch (error) {
-        log('awaiting-login set failed', { source, error })
+    } catch {
+        return
     }
 
     if (awaitingLoginTimeoutId !== null) {
@@ -251,36 +245,17 @@ const setAwaitingLogin = (source: string) => {
 
     awaitingLoginTimeoutId = window.setTimeout(() => {
         awaitingLoginTimeoutId = null
-        clearAwaitingLogin('timeout')
+        clearAwaitingLogin()
     }, AWAITING_LOGIN_TIMEOUT_MS)
 }
 
-const hasAwaitingLogin = () => {
-    const value = readAwaitingLoginValue()
-    const isAwaiting = value === '1'
+const hasAwaitingLogin = () => readAwaitingLoginValue() === '1'
 
-    log('awaiting-login check', {
-        key: AWAITING_LOGIN_KEY,
-        value,
-        isAwaiting,
-    })
-
-    return isAwaiting
-}
-
-const clearAwaitingLogin = (source: string) => {
-    const previousValue = readAwaitingLoginValue()
-
+const clearAwaitingLogin = () => {
     try {
         window.sessionStorage.removeItem(AWAITING_LOGIN_KEY)
-        log('awaiting-login cleared', {
-            source,
-            key: AWAITING_LOGIN_KEY,
-            previousValue,
-            currentValue: readAwaitingLoginValue(),
-        })
-    } catch (error) {
-        log('awaiting-login clear failed', { source, error })
+    } catch {
+        return
     }
 
     if (awaitingLoginTimeoutId !== null) {

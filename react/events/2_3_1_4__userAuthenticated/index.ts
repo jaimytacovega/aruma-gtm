@@ -2,14 +2,12 @@ import { canUseDOM } from 'vtex.render-runtime'
 
 import {
     NOT_AVAILABLE,
-    log,
     pushToDataLayer,
     setAwaitingLogin,
 } from '../../utils'
 import type { UserData } from '../../typings/events'
 
 const LOGIN_FORM_SELECTOR = '[class*="emailAndPasswordForm"]'
-const LOGIN_SUBMIT_SELECTOR = `${LOGIN_FORM_SELECTOR} button[type="submit"]`
 
 let loginAwaitingCaptureAttached = false
 
@@ -73,15 +71,7 @@ const setupLoginAwaitingCapture = () => {
                 return
             }
 
-            log('login submit capture click', {
-                buttonType: button.type,
-                cta:
-                    button
-                        .querySelector('.vtex-button__label')
-                        ?.textContent?.replace(/\s+/g, ' ')
-                        .trim() || button.textContent?.replace(/\s+/g, ' ').trim(),
-            })
-            setAwaitingLogin('capture-login-submit-click')
+            setAwaitingLogin()
         },
         true
     )
@@ -93,17 +83,12 @@ const setupLoginAwaitingCapture = () => {
                 return
             }
 
-            log('login submit capture form')
-            setAwaitingLogin('capture-login-form-submit')
+            setAwaitingLogin()
         },
         true
     )
 
     loginAwaitingCaptureAttached = true
-    log('login awaiting capture attached', {
-        loginFormSelector: LOGIN_FORM_SELECTOR,
-        loginSubmitSelector: LOGIN_SUBMIT_SELECTOR,
-    })
 }
 
 const userAuthenticated = (data: UserData) => {

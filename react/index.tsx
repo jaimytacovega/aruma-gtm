@@ -169,26 +169,12 @@ export const handleEvents = (e: PixelMessage) => {
 
         case 'vtex:userData': {
             const data = e.data as UserData
-            const awaitingLogin = hasAwaitingLogin()
 
-            log('vtex:userData login gate', {
-                isAuthenticated: data.isAuthenticated,
-                awaitingLogin,
-                userId: data.id,
-                email: data.email,
-            })
-
-            if (!data.isAuthenticated) {
-                log('vtex:userData skip: not authenticated')
+            if (!data.isAuthenticated || !hasAwaitingLogin()) {
                 break
             }
 
-            if (!awaitingLogin) {
-                log('vtex:userData skip: awaiting-login flag missing')
-                break
-            }
-
-            clearAwaitingLogin('userData-authenticated')
+            clearAwaitingLogin()
             userAuthenticated(data)
             break
         }
