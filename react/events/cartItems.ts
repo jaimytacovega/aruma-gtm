@@ -14,6 +14,12 @@ const getSlugFromDetailUrl = (detailUrl: string): string => {
   return match?.[1] ?? ''
 }
 
+export const getSlugFromCartItem = (cartItem: VtexCartItem): string => {
+  const catalogSlug = getSlugFromDetailUrl(cartItem.detailUrl)
+
+  return catalogSlug || cartItem.productId
+}
+
 const getCartItemUnitPrice = (cartItem: VtexCartItem): number => {
   if (cartItem.priceIsInt) {
     return cartItem.price / 100
