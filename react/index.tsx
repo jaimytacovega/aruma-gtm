@@ -27,7 +27,10 @@ import { footerSocials } from './events/2_2_2__footerSocials'
 import { registerLoginModal } from './events/2_3_1_1__registerLoginModal'
 import { registerRecoverPassword } from './events/2_3_1_2__registerRecoverPassword'
 import { registerPickButtons } from './events/2_3_1_3__registerPickButtons'
-import { registerUser } from './events/2_3_2_1__registerUser'
+import {
+    handleRegisterUserData,
+    registerUser,
+} from './events/2_3_2_1__registerUser'
 import {
     setupLoginAwaitingCapture,
     userAuthenticated,
@@ -171,6 +174,10 @@ export const handleEvents = (e: PixelMessage) => {
 
         case 'vtex:userData': {
             const data = e.data as UserData
+
+            if (handleRegisterUserData(data)) {
+                break
+            }
 
             if (!data.isAuthenticated || !hasAwaitingLogin()) {
                 break

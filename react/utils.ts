@@ -264,6 +264,57 @@ const clearAwaitingLogin = () => {
     }
 }
 
+const AWAITING_REGISTER_USER_PROPERTIES_KEY =
+    'aruma-gtm:awaiting-register-user-properties'
+const AWAITING_REGISTER_USER_PROPERTIES_TIMEOUT_MS = 60000
+let awaitingRegisterUserPropertiesTimeoutId: number | null = null
+
+const readAwaitingRegisterUserPropertiesValue = () => {
+    try {
+        return window.sessionStorage.getItem(
+            AWAITING_REGISTER_USER_PROPERTIES_KEY
+        )
+    } catch {
+        return null
+    }
+}
+
+const setAwaitingRegisterUserProperties = () => {
+    try {
+        window.sessionStorage.setItem(
+            AWAITING_REGISTER_USER_PROPERTIES_KEY,
+            '1'
+        )
+    } catch {
+        return
+    }
+
+    if (awaitingRegisterUserPropertiesTimeoutId !== null) {
+        window.clearTimeout(awaitingRegisterUserPropertiesTimeoutId)
+    }
+
+    awaitingRegisterUserPropertiesTimeoutId = window.setTimeout(() => {
+        awaitingRegisterUserPropertiesTimeoutId = null
+        clearAwaitingRegisterUserProperties()
+    }, AWAITING_REGISTER_USER_PROPERTIES_TIMEOUT_MS)
+}
+
+const hasAwaitingRegisterUserProperties = () =>
+    readAwaitingRegisterUserPropertiesValue() === '1'
+
+const clearAwaitingRegisterUserProperties = () => {
+    try {
+        window.sessionStorage.removeItem(AWAITING_REGISTER_USER_PROPERTIES_KEY)
+    } catch {
+        return
+    }
+
+    if (awaitingRegisterUserPropertiesTimeoutId !== null) {
+        window.clearTimeout(awaitingRegisterUserPropertiesTimeoutId)
+        awaitingRegisterUserPropertiesTimeoutId = null
+    }
+}
+
 export {
     pushToDataLayer,
     getListFromLastSelectItem,
@@ -273,4 +324,7 @@ export {
     setAwaitingLogin,
     hasAwaitingLogin,
     clearAwaitingLogin,
+    setAwaitingRegisterUserProperties,
+    hasAwaitingRegisterUserProperties,
+    clearAwaitingRegisterUserProperties,
 }
