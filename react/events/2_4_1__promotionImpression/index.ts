@@ -714,7 +714,7 @@ const handleIntersection: IntersectionObserverCallback = (entries) => {
     }
 }
 
-const disconnectViewPromotion = () => {
+const disconnectPromotionImpression = () => {
     if (mutationDebounceTimer !== null) {
         window.clearTimeout(mutationDebounceTimer)
         mutationDebounceTimer = null
@@ -843,13 +843,13 @@ const connectViewPromotion = () => {
     waitForAnalyticsLoaded(schedulePromotionObservation)
 }
 
-const viewPromotion = () => {
+const promotionImpression = () => {
     if (!canUseDOM) {
         return
     }
 
-    disconnectViewPromotion()
+    disconnectPromotionImpression()
     connectViewPromotion()
 }
 
-export { viewPromotion, disconnectViewPromotion }
+export { promotionImpression, disconnectPromotionImpression }

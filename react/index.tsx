@@ -35,7 +35,7 @@ import {
     setupLoginAwaitingCapture,
     userAuthenticated,
 } from './events/2_3_1_4__userAuthenticated'
-import { viewPromotion } from './events/2_4_1__viewPromotion'
+import { promotionImpression } from './events/2_4_1__promotionImpression'
 import { registerProductImpression } from './events/3_1__productImpression'
 import { setupProductClickCapture } from './events/productSummary'
 import { fetchCatalogProduct } from './events/3_1__productImpression/catalog'
@@ -113,7 +113,7 @@ export const handleEvents = (e: PixelMessage) => {
             registerProductImpression()
 
             // 2.4.1 Promotion impressions — after analytics_loaded
-            viewPromotion()
+            promotionImpression()
 
             break
         }
