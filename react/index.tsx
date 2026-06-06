@@ -30,7 +30,7 @@ import { registerPickButtons } from './events/2_3_1_3__registerPickButtons'
 import {
     handleRegisterUserData,
     registerUser,
-} from './events/2_3_2_1__registerUser'
+} from './events/2_3_2_1&2__registerUser'
 import {
     setupLoginAwaitingCapture,
     userAuthenticated,
@@ -203,7 +203,7 @@ if (canUseDOM) {
     // 2.3.1.1 Register Login Modal
     registerLoginModal()
 
-    // 2.3.2.1 Register user step 1
+    // 2.3.2.1 & 2.3.2.2 Register user flow
     registerUser()
 
     // 2.1.3 Home Header Search autocomplete
