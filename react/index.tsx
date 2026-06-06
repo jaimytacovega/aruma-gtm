@@ -22,6 +22,7 @@ import {
 
 import { homeHeaderGeneralOptions } from './events/2_1_1__homeHeaderGeneralOptions'
 import { homeHeaderMenu } from './events/2_1_2__homeHeaderMenu'
+import { registerProductSearch } from './events/2_1_3__productSearch'
 import { footerFunctionalOptions } from './events/2_2_1__footerFunctionalOptions'
 import { footerSocials } from './events/2_2_2__footerSocials'
 import { registerLoginModal } from './events/2_3_1_1__registerLoginModal'
@@ -57,8 +58,6 @@ const handleDocumentClick = (event: MouseEvent) => {
     // 2.1.2 Home Header Menu
     homeHeaderMenu(target)
 
-    // TODO: 2.1.3 Home Header Search
-    
     // 2.2.1 Footer Functional Options
     footerFunctionalOptions(target)
 
@@ -99,6 +98,7 @@ export const handleEvents = (e: PixelMessage) => {
             // but pageView is the right hook if you add per-page DOM setup later.
             setupDomClickListeners()
             registerLoginModal()
+            registerProductSearch()
 
             // 3.1 Product Impression
             // After analytics_loaded — avoid product seen before page context on first paint
@@ -203,4 +203,7 @@ if (canUseDOM) {
 
     // 2.3.1.1 Register Login Modal
     registerLoginModal()
+
+    // 2.1.3 Home Header Search autocomplete
+    registerProductSearch()
 }
