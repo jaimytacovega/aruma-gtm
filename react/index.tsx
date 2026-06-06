@@ -27,6 +27,7 @@ import { footerSocials } from './events/2_2_2__footerSocials'
 import { registerLoginModal } from './events/2_3_1_1__registerLoginModal'
 import { registerRecoverPassword } from './events/2_3_1_2__registerRecoverPassword'
 import { registerPickButtons } from './events/2_3_1_3__registerPickButtons'
+import { registerUser } from './events/2_3_2_1__registerUser'
 import {
     setupLoginAwaitingCapture,
     userAuthenticated,
@@ -100,6 +101,7 @@ export const handleEvents = (e: PixelMessage) => {
             // but pageView is the right hook if you add per-page DOM setup later.
             setupDomClickListeners()
             registerLoginModal()
+            registerUser()
             registerProductSearch()
 
             // 3.1 Product Impression
@@ -193,6 +195,9 @@ if (canUseDOM) {
 
     // 2.3.1.1 Register Login Modal
     registerLoginModal()
+
+    // 2.3.2.1 Register user step 1
+    registerUser()
 
     // 2.1.3 Home Header Search autocomplete
     registerProductSearch()
