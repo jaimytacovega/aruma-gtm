@@ -35,6 +35,7 @@ import {
     setupLoginAwaitingCapture,
     userAuthenticated,
 } from './events/2_3_1_4__userAuthenticated'
+import { viewPromotion } from './events/2_4_1__viewPromotion'
 import { registerProductImpression } from './events/3_1__productImpression'
 import { setupProductClickCapture } from './events/productSummary'
 import { fetchCatalogProduct } from './events/3_1__productImpression/catalog'
@@ -110,6 +111,9 @@ export const handleEvents = (e: PixelMessage) => {
             // 3.1 Product Impression
             // After analytics_loaded — avoid product seen before page context on first paint
             registerProductImpression()
+
+            // 2.4.1 Promotion impressions — after analytics_loaded
+            viewPromotion()
 
             break
         }
