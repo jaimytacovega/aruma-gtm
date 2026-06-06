@@ -220,29 +220,72 @@ const pushToDataLayer = (payload: Record<string, unknown>, disableLog: boolean =
     }
 }
 
-const LAST_FIRED_AUTH_USER_KEY = 'aruma-gtm:last-auth-user-id'
+const AWAITING_LOGIN_KEY = 'aruma-gtm:awaiting-login'
+const AWAITING_LOGIN_TIMEOUT_MS = 30000
+let awaitingLoginTimeoutId: number | null = null
 
-const getLastFiredAuthUserId = () => {
+const readAwaitingLoginValue = () => {
     try {
-        return window.localStorage.getItem(LAST_FIRED_AUTH_USER_KEY) || ''
-    } catch {
-        return ''
+        return window.sessionStorage.getItem(AWAITING_LOGIN_KEY)
+    } catch (error) {
+        log('awaiting-login read failed', error)
+        return null
     }
 }
 
-const setLastFiredAuthUserId = (userId: string) => {
+const setAwaitingLogin = (source: string) => {
     try {
-        window.localStorage.setItem(LAST_FIRED_AUTH_USER_KEY, userId)
-    } catch {
-        // localStorage unavailable
+        window.sessionStorage.setItem(AWAITING_LOGIN_KEY, '1')
+        log('awaiting-login set', {
+            source,
+            key: AWAITING_LOGIN_KEY,
+            value: readAwaitingLoginValue(),
+        })
+    } catch (error) {
+        log('awaiting-login set failed', { source, error })
     }
+
+    if (awaitingLoginTimeoutId !== null) {
+        window.clearTimeout(awaitingLoginTimeoutId)
+    }
+
+    awaitingLoginTimeoutId = window.setTimeout(() => {
+        awaitingLoginTimeoutId = null
+        clearAwaitingLogin('timeout')
+    }, AWAITING_LOGIN_TIMEOUT_MS)
 }
 
-const clearLastFiredAuthUserId = () => {
+const hasAwaitingLogin = () => {
+    const value = readAwaitingLoginValue()
+    const isAwaiting = value === '1'
+
+    log('awaiting-login check', {
+        key: AWAITING_LOGIN_KEY,
+        value,
+        isAwaiting,
+    })
+
+    return isAwaiting
+}
+
+const clearAwaitingLogin = (source: string) => {
+    const previousValue = readAwaitingLoginValue()
+
     try {
-        window.localStorage.removeItem(LAST_FIRED_AUTH_USER_KEY)
-    } catch {
-        // localStorage unavailable
+        window.sessionStorage.removeItem(AWAITING_LOGIN_KEY)
+        log('awaiting-login cleared', {
+            source,
+            key: AWAITING_LOGIN_KEY,
+            previousValue,
+            currentValue: readAwaitingLoginValue(),
+        })
+    } catch (error) {
+        log('awaiting-login clear failed', { source, error })
+    }
+
+    if (awaitingLoginTimeoutId !== null) {
+        window.clearTimeout(awaitingLoginTimeoutId)
+        awaitingLoginTimeoutId = null
     }
 }
 
@@ -252,7 +295,7 @@ export {
     log,
     isInsideLoginModalInteraction,
     NOT_AVAILABLE,
-    getLastFiredAuthUserId,
-    setLastFiredAuthUserId,
-    clearLastFiredAuthUserId,
+    setAwaitingLogin,
+    hasAwaitingLogin,
+    clearAwaitingLogin,
 }

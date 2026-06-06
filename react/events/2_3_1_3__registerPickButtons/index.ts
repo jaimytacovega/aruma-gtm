@@ -1,6 +1,5 @@
 import { pushToDataLayer } from '../../utils'
 
-
 const LOGIN_SEND_BUTTON_SELECTOR = [
   '[class*="aruma-login-0-x-sendButton"]',
   '[class*="aruma-aruma-theme-8-x-ButtonLogin"]',

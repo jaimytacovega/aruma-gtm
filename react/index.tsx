@@ -14,9 +14,8 @@ import type {
 
 import {
     pushToDataLayer,
-    getLastFiredAuthUserId,
-    setLastFiredAuthUserId,
-    clearLastFiredAuthUserId,
+    hasAwaitingLogin,
+    clearAwaitingLogin,
     log,
 } from './utils'
 
@@ -28,7 +27,10 @@ import { footerSocials } from './events/2_2_2__footerSocials'
 import { registerLoginModal } from './events/2_3_1_1__registerLoginModal'
 import { registerRecoverPassword } from './events/2_3_1_2__registerRecoverPassword'
 import { registerPickButtons } from './events/2_3_1_3__registerPickButtons'
-import { userAuthenticated } from './events/2_3_1_4__userAuthenticated'
+import {
+    setupLoginAwaitingCapture,
+    userAuthenticated,
+} from './events/2_3_1_4__userAuthenticated'
 import { registerProductImpression } from './events/3_1__productImpression'
 import { setupProductClickCapture } from './events/productSummary'
 import { fetchCatalogProduct } from './events/3_1__productImpression/catalog'
@@ -43,7 +45,6 @@ import { cartImpression } from './events/4_1__cartImpression'
 import { removeFromCart } from './events/4_2__removeFromCart'
 
 let domClickListenerAttached = false
-let wasAuthenticated = false
 
 const handleDocumentClick = (event: MouseEvent) => {
     const target = event.target
@@ -80,6 +81,7 @@ const setupDomClickListeners = () => {
     document.addEventListener('click', handleDocumentClick)
     setupProductClickCapture()
     setupSearchAutocompleteProductClick()
+    setupLoginAwaitingCapture()
     domClickListenerAttached = true
 }
 
@@ -167,25 +169,27 @@ export const handleEvents = (e: PixelMessage) => {
 
         case 'vtex:userData': {
             const data = e.data as UserData
+            const awaitingLogin = hasAwaitingLogin()
+
+            log('vtex:userData login gate', {
+                isAuthenticated: data.isAuthenticated,
+                awaitingLogin,
+                userId: data.id,
+                email: data.email,
+            })
 
             if (!data.isAuthenticated) {
-                clearLastFiredAuthUserId()
-                wasAuthenticated = false
+                log('vtex:userData skip: not authenticated')
                 break
             }
 
-            const alreadyFiredForUser =
-                Boolean(data.id) && getLastFiredAuthUserId() === data.id
-
-            if (!wasAuthenticated && !alreadyFiredForUser) {
-                userAuthenticated(data)
-
-                if (data.id) {
-                    setLastFiredAuthUserId(data.id)
-                }
+            if (!awaitingLogin) {
+                log('vtex:userData skip: awaiting-login flag missing')
+                break
             }
 
-            wasAuthenticated = true
+            clearAwaitingLogin('userData-authenticated')
+            userAuthenticated(data)
             break
         }
 
