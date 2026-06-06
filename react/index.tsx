@@ -8,10 +8,17 @@ import type {
     ProductClickData,
     ProductViewData,
     RemoveToCartData,
+    UserData,
     ViewCartData,
 } from './typings/events'
 
-import { pushToDataLayer, log } from './utils'
+import {
+    pushToDataLayer,
+    getLastFiredAuthUserId,
+    setLastFiredAuthUserId,
+    clearLastFiredAuthUserId,
+    log,
+} from './utils'
 
 import { homeHeaderGeneralOptions } from './events/2_1_1__homeHeaderGeneralOptions'
 import { homeHeaderMenu } from './events/2_1_2__homeHeaderMenu'
@@ -20,6 +27,7 @@ import { footerSocials } from './events/2_2_2__footerSocials'
 import { registerLoginModal } from './events/2_3_1_1__registerLoginModal'
 import { registerRecoverPassword } from './events/2_3_1_2__registerRecoverPassword'
 import { registerPickButtons } from './events/2_3_1_3__registerPickButtons'
+import { userAuthenticated } from './events/2_3_1_4__userAuthenticated'
 import { registerProductImpression } from './events/3_1__productImpression'
 import { setupProductClickCapture } from './events/productSummary'
 import { fetchCatalogProduct } from './events/3_1__productImpression/catalog'
@@ -34,6 +42,7 @@ import { cartImpression } from './events/4_1__cartImpression'
 import { removeFromCart } from './events/4_2__removeFromCart'
 
 let domClickListenerAttached = false
+let wasAuthenticated = false
 
 const handleDocumentClick = (event: MouseEvent) => {
     const target = event.target
@@ -153,6 +162,30 @@ export const handleEvents = (e: PixelMessage) => {
 
             // TODO: 4.2 Only on storefront minicart
             removeFromCart(data)
+            break
+        }
+
+        case 'vtex:userData': {
+            const data = e.data as UserData
+
+            if (!data.isAuthenticated) {
+                clearLastFiredAuthUserId()
+                wasAuthenticated = false
+                break
+            }
+
+            const alreadyFiredForUser =
+                Boolean(data.id) && getLastFiredAuthUserId() === data.id
+
+            if (!wasAuthenticated && !alreadyFiredForUser) {
+                userAuthenticated(data)
+
+                if (data.id) {
+                    setLastFiredAuthUserId(data.id)
+                }
+            }
+
+            wasAuthenticated = true
             break
         }
 

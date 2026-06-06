@@ -220,10 +220,39 @@ const pushToDataLayer = (payload: Record<string, unknown>, disableLog: boolean =
     }
 }
 
+const LAST_FIRED_AUTH_USER_KEY = 'aruma-gtm:last-auth-user-id'
+
+const getLastFiredAuthUserId = () => {
+    try {
+        return window.localStorage.getItem(LAST_FIRED_AUTH_USER_KEY) || ''
+    } catch {
+        return ''
+    }
+}
+
+const setLastFiredAuthUserId = (userId: string) => {
+    try {
+        window.localStorage.setItem(LAST_FIRED_AUTH_USER_KEY, userId)
+    } catch {
+        // localStorage unavailable
+    }
+}
+
+const clearLastFiredAuthUserId = () => {
+    try {
+        window.localStorage.removeItem(LAST_FIRED_AUTH_USER_KEY)
+    } catch {
+        // localStorage unavailable
+    }
+}
+
 export {
     pushToDataLayer,
     getListFromLastSelectItem,
     log,
     isInsideLoginModalInteraction,
     NOT_AVAILABLE,
+    getLastFiredAuthUserId,
+    setLastFiredAuthUserId,
+    clearLastFiredAuthUserId,
 }
