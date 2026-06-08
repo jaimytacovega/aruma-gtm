@@ -125,17 +125,8 @@ export const handleEvents = (e: PixelMessage) => {
         case 'vtex:productClick': {
             const data = e.data as ProductClickData
 
-            // log('vtex:productClick', data)
-            // log('vtex:productClick linkText', data.product.linkText)
-
             if (data.product.linkText) {
                 void fetchCatalogProduct(data.product.linkText)
-                    .then((catalog) => {
-                        log('vtex:productClick catalog', catalog)
-                    })
-                    .catch((error) => {
-                        log('vtex:productClick catalog error', error)
-                    })
             }
             
             // 3.2 Product Click
