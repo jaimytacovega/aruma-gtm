@@ -1,10 +1,35 @@
 import { NOT_AVAILABLE } from '../utils'
 
+const PROMOTION_MODAL_SELECTOR = '[class*="paper--imagen-modal-promociones"]'
+const PROMOTION_MODAL_LINK_SELECTOR =
+    '[class*="imageElementLink--imagen-modal-promociones"]'
+
+const isPromotionModalLink = (link: HTMLAnchorElement): boolean =>
+    link.matches(PROMOTION_MODAL_LINK_SELECTOR) ||
+    Boolean(link.closest(PROMOTION_MODAL_SELECTOR))
+
+const resolvePromotionModalRoot = (
+    link: HTMLAnchorElement
+): HTMLElement | null => {
+    const modal = link.closest(PROMOTION_MODAL_SELECTOR)
+
+    if (modal instanceof HTMLElement) {
+        return modal
+    }
+
+    if (isPromotionModalLink(link)) {
+        return link
+    }
+
+    return null
+}
+
 const PROMOTION_CONTAINER_SELECTORS = [
     '[class*="sliderLayoutContainer--shopByCategory"]',
     '[class*="sliderLayoutContainer--slider-banners"]',
     '[class*="flexRowContent--banner-x3"]',
     '[class*="flexRowContent--PromoSectionBoxesSimple"]',
+    PROMOTION_MODAL_SELECTOR,
 ].join(', ')
 
 type PromotionMeta = {
@@ -199,6 +224,31 @@ const parseBannerX3Item = (
     }
 }
 
+const parsePromotionModal = (
+    modal: HTMLElement,
+    index: number
+): PromotionMeta | null => {
+    const href = getHrefFromElement(modal)
+
+    if (!href) {
+        return null
+    }
+
+    const promotionName = getPathPromotionName(href)
+    const promotionId = getStablePromotionId(modal, href, promotionName)
+
+    return {
+        carouselId: 'imagen-modal-promociones',
+        creativeName: 'imagen-modal-promociones',
+        creativeSlot: `imagen-modal-promociones-${index + 1}`,
+        promotionId,
+        promotionName,
+        href,
+        productSlug: getProductSlugFromHref(href),
+        itemIndex: index + 1,
+    }
+}
+
 const parsePromoSectionBox = (
     link: HTMLAnchorElement,
     index: number
@@ -273,6 +323,46 @@ const collectBannerX3Items = (row: HTMLElement): HTMLElement[] => {
     return banners
 }
 
+const collectPromotionModalItems = (): HTMLElement[] => {
+    const modals: HTMLElement[] = []
+    const seen = new Set<HTMLElement>()
+
+    const addModal = (modal: HTMLElement) => {
+        if (seen.has(modal)) {
+            return
+        }
+
+        seen.add(modal)
+        modals.push(modal)
+    }
+
+    document.querySelectorAll(PROMOTION_MODAL_SELECTOR).forEach((modal) => {
+        if (
+            modal instanceof HTMLElement &&
+            modal.querySelector('a[href]')
+        ) {
+            addModal(modal)
+        }
+    })
+
+    document.querySelectorAll(PROMOTION_MODAL_LINK_SELECTOR).forEach((link) => {
+        if (!(link instanceof HTMLAnchorElement) || !link.href) {
+            return
+        }
+
+        const root = link.closest(PROMOTION_MODAL_SELECTOR)
+
+        if (root instanceof HTMLElement) {
+            addModal(root)
+            return
+        }
+
+        addModal(link)
+    })
+
+    return modals
+}
+
 const collectPromoSectionBoxes = (row: HTMLElement): HTMLElement[] => {
     const links: HTMLElement[] = []
 
@@ -329,6 +419,8 @@ const collectPromotionElements = (): HTMLElement[] => {
             }
         })
 
+    elements.push.apply(elements, collectPromotionModalItems())
+
     return elements
 }
 
@@ -371,6 +463,19 @@ const getPromotionIndex = (element: HTMLElement): number => {
         }
     }
 
+    const modal = element.closest(PROMOTION_MODAL_SELECTOR)
+
+    if (modal instanceof HTMLElement) {
+        return collectPromotionModalItems().indexOf(modal)
+    }
+
+    if (
+        element instanceof HTMLAnchorElement &&
+        isPromotionModalLink(element)
+    ) {
+        return collectPromotionModalItems().indexOf(element)
+    }
+
     return 0
 }
 
@@ -405,6 +510,19 @@ const parsePromotionMeta = (element: HTMLElement): PromotionMeta | null => {
         element.closest('[class*="flexRowContent--PromoSectionBoxesSimple"]')
     ) {
         return parsePromoSectionBox(element, index)
+    }
+
+    const modal = element.closest(PROMOTION_MODAL_SELECTOR)
+
+    if (modal instanceof HTMLElement) {
+        return parsePromotionModal(modal, index)
+    }
+
+    if (
+        element instanceof HTMLAnchorElement &&
+        isPromotionModalLink(element)
+    ) {
+        return parsePromotionModal(element, index)
     }
 
     return null
@@ -456,6 +574,12 @@ const findPromotionElementFromTarget = (
         clickedLink.querySelector('img[src]')
     ) {
         return clickedLink
+    }
+
+    const promoModalRoot = resolvePromotionModalRoot(clickedLink)
+
+    if (promoModalRoot) {
+        return promoModalRoot
     }
 
     return null

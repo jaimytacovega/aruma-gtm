@@ -10,6 +10,8 @@ import {
 } from '../promotionMeta'
 import type { PromotionMeta } from '../promotionMeta'
 
+let promotionClickCaptureAttached = false
+
 const pushSelectPromotion = async (meta: PromotionMeta) => {
     const ecommerce: {
         creative_name: string
@@ -54,6 +56,58 @@ const pushSelectPromotion = async (meta: PromotionMeta) => {
     })
 }
 
+const resolvePromotionClickElement = (
+    event: MouseEvent
+): HTMLElement | null => {
+    if (typeof event.composedPath === 'function') {
+        for (const node of event.composedPath()) {
+            if (!(node instanceof Element)) {
+                continue
+            }
+
+            const element = findPromotionElementFromTarget(node)
+
+            if (element) {
+                return element
+            }
+        }
+
+        return null
+    }
+
+    if (!(event.target instanceof Element)) {
+        return null
+    }
+
+    return findPromotionElementFromTarget(event.target)
+}
+
+const handlePromotionClick = (event: MouseEvent) => {
+    const element = resolvePromotionClickElement(event)
+
+    if (!element) {
+        return
+    }
+
+    const meta = parsePromotionMeta(element)
+
+    if (!meta) {
+        return
+    }
+
+    void pushSelectPromotion(meta)
+}
+
+/** Capture phase so modal links are tracked before VTEX stops propagation. */
+const setupPromotionClickCapture = (): void => {
+    if (promotionClickCaptureAttached || typeof document === 'undefined') {
+        return
+    }
+
+    document.addEventListener('click', handlePromotionClick, true)
+    promotionClickCaptureAttached = true
+}
+
 const promotionClick = (target: Element) => {
     const element = findPromotionElementFromTarget(target)
 
@@ -70,4 +124,4 @@ const promotionClick = (target: Element) => {
     void pushSelectPromotion(meta)
 }
 
-export { promotionClick }
+export { promotionClick, setupPromotionClickCapture }

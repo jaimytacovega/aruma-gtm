@@ -36,7 +36,7 @@ import {
     userAuthenticated,
 } from './events/2_3_1_4__userAuthenticated'
 import { promotionImpression } from './events/2_4_1__promotionImpression'
-import { promotionClick } from './events/2_4_2__promotionClick'
+import { setupPromotionClickCapture } from './events/2_4_2__promotionClick'
 import { registerProductImpression } from './events/3_1__productImpression'
 import { setupProductClickCapture } from './events/productSummary'
 import { fetchCatalogProduct } from './events/3_1__productImpression/catalog'
@@ -77,8 +77,6 @@ const handleDocumentClick = (event: MouseEvent) => {
     // 2.3.1.3 Login modal buttons (Ingresar / Crear cuenta)
     registerPickButtons(target)
 
-    // 2.4.2 Promotion click
-    promotionClick(target)
 }
 
 /** VTEX has no pixel event for arbitrary DOM clicks — use delegation on document. */
@@ -89,6 +87,7 @@ const setupDomClickListeners = () => {
 
     document.addEventListener('click', handleDocumentClick)
     setupProductClickCapture()
+    setupPromotionClickCapture()
     setupSearchAutocompleteProductClick()
     setupLoginAwaitingCapture()
     domClickListenerAttached = true
