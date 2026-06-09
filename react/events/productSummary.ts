@@ -85,7 +85,7 @@ const SECTION_TITLE_SELECTOR = [
 
 const SHELF_CONTAINER_SELECTOR = '[class*="sliderLayoutContainer"]'
 
-const MAGENTA_POINTS_LIST_LABEL = 'Magenta Points'
+export const MAGENTA_POINTS_LIST_LABEL = 'Magenta Points'
 const MAGENTA_POINTS_BIENVENIDO_PATH = '/magenta-points/bienvenido'
 
 const isMagentaPointsBienvenidoPage = (): boolean =>

@@ -1,11 +1,13 @@
-import { getListFromLastSelectItem, log, pushToDataLayer } from '../../utils'
+import { getListFromLastSelectItem, log, NOT_AVAILABLE, pushToDataLayer } from '../../utils'
 import type { ProductViewData } from '../../typings/events'
 
 import {
     buildViewItem,
     buildViewItemPayload,
     fetchCatalogProduct,
+    isMagentaPointsProduct,
 } from '../3_1__productImpression/catalog'
+import { MAGENTA_POINTS_LIST_LABEL } from '../productSummary'
 
 const getCommercialOfferFromProduct = (data: ProductViewData) =>
     data.product.selectedSku?.sellers?.[0]?.commertialOffer ??
@@ -41,10 +43,23 @@ const productDetail = async (data: ProductViewData) => {
         }
     }
 
-    const { listId, listName } = getListFromLastSelectItem(
+    const listFromHistory = getListFromLastSelectItem(
         slug,
         data.product.productId
     )
+    const isMagentaPoints = isMagentaPointsProduct(
+        catalog,
+        data.product.categories
+    )
+    const { listId, listName } =
+        listFromHistory.listId !== NOT_AVAILABLE
+            ? listFromHistory
+            : isMagentaPoints
+              ? {
+                    listId: MAGENTA_POINTS_LIST_LABEL,
+                    listName: MAGENTA_POINTS_LIST_LABEL,
+                }
+              : listFromHistory
     const { price, listPrice } = getPriceAndDiscountFromProduct(data)
 
     const item = buildViewItem(

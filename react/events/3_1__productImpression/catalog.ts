@@ -176,7 +176,7 @@ const categoriesIncludeMagentaPoints = (
     (part) => part.trim().toLowerCase() === MAGENTA_POINTS_CATEGORY
   )
 
-const isMagentaPointsProduct = (
+export const isMagentaPointsProduct = (
   catalog: CatalogProduct | null,
   categories?: string[]
 ): boolean => {
