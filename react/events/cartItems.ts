@@ -1,9 +1,14 @@
 import { saveListContextForProduct } from '../listContextStore'
-import { getListFromLastSelectItem, log } from '../utils'
+import { getListFromLastSelectItem, log, NOT_AVAILABLE } from '../utils'
 import type { AddToCartData } from '../typings/events'
 
-import { buildViewItem, fetchCatalogProduct } from './3_1__productImpression/catalog'
+import {
+  buildViewItem,
+  fetchCatalogProduct,
+  isMagentaPointsProduct,
+} from './3_1__productImpression/catalog'
 import type { ViewItem } from './3_1__productImpression/catalog'
+import { MAGENTA_POINTS_LIST_LABEL } from './productSummary'
 
 export type VtexCartItem = AddToCartData['items'][number]
 
@@ -71,6 +76,37 @@ export const enrichCartItems = async (
     })
   )
 
+const resolveListContextForCartItem = async (
+  cartItem: VtexCartItem
+): Promise<{ listId: string; listName: string }> => {
+  const slug = getSlugFromCartItem(cartItem)
+  const fromHistory = getListFromLastSelectItem(slug, cartItem.productId)
+
+  if (fromHistory.listId !== NOT_AVAILABLE) {
+    return fromHistory
+  }
+
+  const catalogSlug = getSlugFromDetailUrl(cartItem.detailUrl)
+  const categories = cartItem.category ? [cartItem.category] : undefined
+
+  if (catalogSlug) {
+    try {
+      const catalog = await fetchCatalogProduct(catalogSlug)
+
+      if (isMagentaPointsProduct(catalog, categories)) {
+        return {
+          listId: MAGENTA_POINTS_LIST_LABEL,
+          listName: MAGENTA_POINTS_LIST_LABEL,
+        }
+      }
+    } catch (error) {
+      log('resolve list context catalog error', error)
+    }
+  }
+
+  return fromHistory
+}
+
 /** Per-item list context from impression / select_item (dataLayer + localStorage). */
 export const enrichCartItemsWithStoredListContext = async (
   cartItems: VtexCartItem[],
@@ -80,10 +116,7 @@ export const enrichCartItemsWithStoredListContext = async (
 
   for (const cartItem of cartItems) {
     const slug = getSlugFromCartItem(cartItem)
-    const { listId, listName } = getListFromLastSelectItem(
-      slug,
-      cartItem.productId
-    )
+    const { listId, listName } = await resolveListContextForCartItem(cartItem)
 
     saveListContextForProduct({
       slug,
