@@ -1,51 +1,94 @@
 /**
- * Checkout order placed: virtualPage. Paste before checkout-ui-custom.js.
+ * Checkout order placed (/checkout/orderPlaced/?og=...): virtualPage.
+ * Paste before checkout-ui-custom.js.
+ *
+ * Note: Aruma loads order placed via the IO storefront (react pixel), not
+ * checkout6-custom.js. The live handlers are react/events/5_4_1__successPaymentScreening.
+ * This checkout module remains for hash-route / legacy checkout-only flows.
  */
 ;((global) => {
+  const SUCCESS_PAGE_TITLE = 'Aruma - Checkout - Compra exitosa'
+  const SUCCESS_CHECKOUT_SCREEN = 'success'
+
   global.create5_4_1__successPaymentScreening = ({
     pushToDataLayer,
     orderFormUtils,
+    ensurePaymentScreening,
   }) => {
     const log = (...args) => {
       console.info('[aruma-gtm]', '5_4_1__successPaymentScreening', ...args)
     }
 
-    let lastVirtualPageUrl = ''
+    let pushInFlight = false
 
-    const pushSuccessPaymentVirtualPage = (source) => {
-      const isOrderPlaced = orderFormUtils.isCheckoutOrderPlacedPage()
-      const pageUrl = global.location.href
+    const ensurePriorCheckoutScreens = () => {
+      if (typeof ensurePaymentScreening === 'function') {
+        ensurePaymentScreening()
+      }
+    }
 
-      log('push attempt', {
-        source,
-        isOrderPlaced,
-        pathname: global.location.pathname,
-        hash: global.location.hash,
-        search: global.location.search,
-        pageUrl,
-        lastVirtualPageUrl,
-      })
+    const getSuccessPageLocation = () =>
+      `${global.location.origin}/checkout/compra-exitosa`
 
-      if (!isOrderPlaced) {
-        log('skip: not order placed page')
+    const pushSuccessPaymentVirtualPage = async (source) => {
+      if (!orderFormUtils.isCheckoutOrderPlacedPage()) {
+        log('skip: not order placed page', { source })
         return
       }
 
-      if (pageUrl === lastVirtualPageUrl) {
-        log('skip: duplicate pageUrl')
+      const orderGroup = orderFormUtils.getOrderGroupFromUrl()
+
+      if (!orderGroup) {
+        log('skip: missing og query param', { source })
         return
       }
 
-      lastVirtualPageUrl = pageUrl
+      if (orderFormUtils.hasFiredOrderPlacedEvent('virtualPage', orderGroup)) {
+        log('skip: already fired for order group', { source, orderGroup })
+        return
+      }
+
+      if (pushInFlight) {
+        log('skip: push already in flight', { source, orderGroup })
+        return
+      }
+
+      pushInFlight = true
+
+      let orderForm
+
+      try {
+        orderForm = await orderFormUtils.loadOrderPlacedOrderForm()
+      } catch (error) {
+        log('loadOrderPlacedOrderForm failed', { source, orderGroup, error })
+        pushInFlight = false
+        return
+      }
+
+      if (!orderForm?.items?.length) {
+        log('skip: order group has no items yet', {
+          source,
+          orderGroup,
+          itemCount: orderForm?.items?.length ?? 0,
+        })
+        pushInFlight = false
+        return
+      }
+
+      ensurePriorCheckoutScreens()
 
       const payload = {
         event: 'virtualPage',
-        page_location: pageUrl,
-        page_title: 'Aruma - Checkout - Compra exitosa',
+        page_location: getSuccessPageLocation(),
+        page_title: SUCCESS_PAGE_TITLE,
+        checkout_screen: SUCCESS_CHECKOUT_SCREEN,
+        order_group: orderGroup,
       }
 
-      log('pushing virtualPage', payload)
+      log('pushing virtualPage', { source, orderGroup, payload })
       pushToDataLayer(payload)
+      orderFormUtils.markOrderPlacedEventFired('virtualPage', orderGroup)
+      pushInFlight = false
     }
 
     const onHashChange = () => {
@@ -55,16 +98,14 @@
       })
 
       if (!orderFormUtils.isCheckoutOrderPlacedPage()) {
-        lastVirtualPageUrl = ''
-        log('left order placed page, reset dedupe')
         return
       }
 
-      pushSuccessPaymentVirtualPage('hashchange')
+      void pushSuccessPaymentVirtualPage('hashchange')
     }
 
     const sync = () => {
-      pushSuccessPaymentVirtualPage('sync')
+      void pushSuccessPaymentVirtualPage('sync')
     }
 
     const attach = () => {
@@ -74,11 +115,19 @@
         orderGroup: orderFormUtils.getOrderGroupFromUrl?.() ?? '',
       })
 
-      pushSuccessPaymentVirtualPage('attach')
+      orderFormUtils.setupOrderPlacedTransitionWatcher()
+
+      if (typeof orderFormUtils.onOrderPlacedTransition === 'function') {
+        orderFormUtils.onOrderPlacedTransition((source) => {
+          void pushSuccessPaymentVirtualPage(`transition:${source}`)
+        })
+      }
+
+      void pushSuccessPaymentVirtualPage('attach')
 
       global.addEventListener('hashchange', onHashChange)
       global.addEventListener('pageshow', () => {
-        pushSuccessPaymentVirtualPage('pageshow')
+        void pushSuccessPaymentVirtualPage('pageshow')
       })
     }
 

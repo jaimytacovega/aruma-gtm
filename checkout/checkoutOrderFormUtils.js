@@ -179,7 +179,136 @@
         items,
         orderGroup: primary.orderGroup || getOrderGroupFromUrl(),
         value: orders.reduce((sum, order) => sum + (order.value || 0), 0),
+        totalizers: primary.totalizers ?? [],
+        paymentData: primary.paymentData ?? null,
+        shippingData: primary.shippingData ?? null,
+        marketingData: primary.marketingData ?? null,
+        storePreferencesData: primary.storePreferencesData ?? null,
       }
+    }
+
+    const FIRED_ORDER_PLACED_KEY = 'aruma-gtm:fired-order-placed-events'
+
+    const readFiredOrderPlacedStore = () => {
+      try {
+        const raw = global.localStorage?.getItem(FIRED_ORDER_PLACED_KEY)
+
+        if (raw) {
+          const parsed = JSON.parse(raw)
+
+          return {
+            virtualPage: new Set(parsed.virtualPage ?? []),
+            purchase: new Set(parsed.purchase ?? []),
+          }
+        }
+      } catch {
+        // localStorage unavailable or corrupt
+      }
+
+      return { virtualPage: new Set(), purchase: new Set() }
+    }
+
+    const writeFiredOrderPlacedStore = (store) => {
+      try {
+        global.localStorage?.setItem(
+          FIRED_ORDER_PLACED_KEY,
+          JSON.stringify({
+            virtualPage: [...store.virtualPage],
+            purchase: [...store.purchase],
+          })
+        )
+      } catch {
+        // localStorage unavailable
+      }
+    }
+
+    const hasFiredOrderPlacedEvent = (eventName, orderGroup) => {
+      if (!orderGroup) {
+        return false
+      }
+
+      const store = readFiredOrderPlacedStore()
+
+      return store[eventName]?.has(orderGroup) ?? false
+    }
+
+    const markOrderPlacedEventFired = (eventName, orderGroup) => {
+      if (!orderGroup) {
+        return
+      }
+
+      const store = readFiredOrderPlacedStore()
+      store[eventName].add(orderGroup)
+      writeFiredOrderPlacedStore(store)
+    }
+
+    let orderPlacedTransitionWatcherAttached = false
+    const orderPlacedTransitionListeners = new Set()
+
+    const notifyOrderPlacedTransition = (source) => {
+      if (!isCheckoutOrderPlacedPage()) {
+        return
+      }
+
+      orderPlacedTransitionListeners.forEach((listener) => {
+        listener(source)
+      })
+    }
+
+    const onOrderPlacedTransition = (listener) => {
+      orderPlacedTransitionListeners.add(listener)
+
+      return () => {
+        orderPlacedTransitionListeners.delete(listener)
+      }
+    }
+
+    const setupOrderPlacedTransitionWatcher = () => {
+      if (orderPlacedTransitionWatcherAttached) {
+        return
+      }
+
+      orderPlacedTransitionWatcherAttached = true
+
+      let lastHref = global.location.href
+
+      const checkTransition = (source) => {
+        const href = global.location.href
+
+        if (href !== lastHref) {
+          lastHref = href
+        }
+
+        notifyOrderPlacedTransition(source)
+      }
+
+      global.setInterval(() => {
+        checkTransition('poll')
+      }, 200)
+
+      const wrapHistoryMethod = (methodName) => {
+        const original = global.history?.[methodName]
+
+        if (typeof original !== 'function') {
+          return
+        }
+
+        global.history[methodName] = function patchedHistoryMethod(...args) {
+          const result = original.apply(this, args)
+          global.setTimeout(() => {
+            checkTransition(`history.${methodName}`)
+          }, 0)
+
+          return result
+        }
+      }
+
+      wrapHistoryMethod('pushState')
+      wrapHistoryMethod('replaceState')
+
+      global.addEventListener('popstate', () => {
+        checkTransition('popstate')
+      })
     }
 
     const loadOrderPlacedOrderForm = async () => {
@@ -322,6 +451,10 @@
       getPaymentType,
       getShippingTier,
       getTransactionId,
+      hasFiredOrderPlacedEvent,
+      markOrderPlacedEventFired,
+      onOrderPlacedTransition,
+      setupOrderPlacedTransitionWatcher,
       getTax: (orderForm) => getTotalizerValue(orderForm, 'Tax'),
       getShipping: (orderForm) => getTotalizerValue(orderForm, 'Shipping'),
       buildItemsEcommerceTotals,

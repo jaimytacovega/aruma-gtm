@@ -299,6 +299,7 @@
   const successPaymentScreening = window.create5_4_1__successPaymentScreening({
     pushToDataLayer,
     orderFormUtils,
+    ensurePaymentScreening: paymentScreening.ensurePaymentVirtualPage,
   })
 
   const successPayment = window.create5_4_2__successPayment({
@@ -351,7 +352,7 @@
     shippingScreening.attach()
     submitShipping()
     shippingPickButton()
-    paymentScreening()
+    paymentScreening.attach()
     paymentInfo()
     paymentPickButton()
     successPaymentScreening.attach()
@@ -361,7 +362,8 @@
     document.addEventListener('click', handleCartButtonsClick, true)
   }
 
-  window.setInterval(watchCheckoutHref, 400)
+  orderFormUtils.setupOrderPlacedTransitionWatcher()
+  window.setInterval(watchCheckoutHref, 200)
   window.addEventListener('popstate', syncOrderPlacedEvents)
   window.addEventListener('pageshow', syncOrderPlacedEvents)
 

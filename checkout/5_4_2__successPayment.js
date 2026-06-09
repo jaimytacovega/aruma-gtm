@@ -1,5 +1,9 @@
 /**
  * Checkout order placed (/checkout/orderPlaced/?og=...): purchase event.
+ *
+ * Note: Aruma loads order placed via the IO storefront (react pixel), not
+ * checkout6-custom.js. The live handlers are react/events/5_4_2__successPayment.
+ * This checkout module remains for hash-route / legacy checkout-only flows.
  */
 ;((global) => {
   const LOAD_RETRY_MS = 500
@@ -15,7 +19,7 @@
       console.info('[aruma-gtm]', '5_4_2__successPayment', ...args)
     }
 
-    let lastPurchaseTransactionId = ''
+    let purchaseInFlight = false
     let loadAttempts = 0
     let loadTimeoutId = null
 
@@ -54,25 +58,30 @@
 
       if (!orderFormUtils.isCheckoutOrderPlacedPage()) {
         log('runPurchase skip: not order placed page')
-        return
+        return false
       }
 
       if (!orderForm?.items?.length) {
         log('runPurchase skip: no items on orderForm', orderForm)
-        return
+        return false
       }
 
       const transaction_id = orderFormUtils.getTransactionId(orderForm)
 
       if (
-        transaction_id === lastPurchaseTransactionId &&
-        transaction_id !== NOT_AVAILABLE
+        transaction_id !== NOT_AVAILABLE &&
+        orderFormUtils.hasFiredOrderPlacedEvent('purchase', transaction_id)
       ) {
-        log('runPurchase skip: duplicate transaction_id', transaction_id)
-        return
+        log('runPurchase skip: already fired for transaction_id', transaction_id)
+        return true
       }
 
-      lastPurchaseTransactionId = transaction_id
+      if (purchaseInFlight) {
+        log('runPurchase skip: purchase already in flight', transaction_id)
+        return false
+      }
+
+      purchaseInFlight = true
 
       const currency = orderFormUtils.getCurrency(orderForm)
       const coupon = orderFormUtils.getCoupon(orderForm)
@@ -95,7 +104,8 @@
         )
       } catch (error) {
         log('enrichOrderFormItems failed', error)
-        return
+        purchaseInFlight = false
+        return false
       }
 
       const totals = orderFormUtils.buildItemsEcommerceTotals(items)
@@ -117,6 +127,14 @@
         value: totals.value,
       })
       pushToDataLayer(payload)
+
+      if (transaction_id !== NOT_AVAILABLE) {
+        orderFormUtils.markOrderPlacedEventFired('purchase', transaction_id)
+      }
+
+      purchaseInFlight = false
+
+      return true
     }
 
     const tryLoadAndRunPurchase = async (source) => {
@@ -133,6 +151,16 @@
       if (!isOrderPlaced) {
         log('tryLoadAndRunPurchase skip: not order placed page')
         return false
+      }
+
+      const orderGroup = orderFormUtils.getOrderGroupFromUrl()
+
+      if (
+        orderGroup &&
+        orderFormUtils.hasFiredOrderPlacedEvent('purchase', orderGroup)
+      ) {
+        log('tryLoadAndRunPurchase skip: purchase already fired', orderGroup)
+        return true
       }
 
       let orderForm
@@ -152,8 +180,7 @@
       })
 
       if (orderForm?.items?.length) {
-        await runPurchase(orderForm, source)
-        return true
+        return runPurchase(orderForm, source)
       }
 
       log('tryLoadAndRunPurchase: no items yet')
@@ -217,8 +244,7 @@
         return
       }
 
-      log('left order placed page, reset state')
-      lastPurchaseTransactionId = ''
+      log('left order placed page, reset retry state')
       loadAttempts = 0
 
       if (loadTimeoutId !== null) {
@@ -257,6 +283,14 @@
         hasVtexjs: Boolean(global.vtexjs?.checkout),
         hasJQuery: Boolean(global.jQuery),
       })
+
+      orderFormUtils.setupOrderPlacedTransitionWatcher()
+
+      if (typeof orderFormUtils.onOrderPlacedTransition === 'function') {
+        orderFormUtils.onOrderPlacedTransition((source) => {
+          requestOrderForm(`transition:${source}`)
+        })
+      }
 
       if (isOrderPlaced) {
         requestOrderForm('attach')

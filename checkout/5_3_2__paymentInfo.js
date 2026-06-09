@@ -3,6 +3,18 @@
  */
 ;((global) => {
   const PURCHASE_BUTTON_SELECTOR = '#btn-finalizar-compra'
+  const AWAITING_ORDER_PLACED_KEY = 'aruma-gtm:awaiting-order-placed'
+
+  const setAwaitingOrderPlaced = () => {
+    try {
+      global.sessionStorage.setItem(
+        AWAITING_ORDER_PLACED_KEY,
+        String(Date.now())
+      )
+    } catch {
+      // sessionStorage unavailable
+    }
+  }
 
   const isPurchaseButtonEnabled = (button) => {
     if (button.hasAttribute('disabled')) {
@@ -99,6 +111,8 @@
       pushToDataLayer(
         buildAddPaymentInfoPayload(items, currency, coupon, payment_type, totals)
       )
+
+      setAwaitingOrderPlaced()
     }
 
     const requestOrderForm = () => {

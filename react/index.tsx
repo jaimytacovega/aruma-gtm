@@ -3,6 +3,7 @@ import { canUseDOM } from 'vtex.render-runtime'
 import type {
     AddToCartData,
     AddToWishlistData,
+    OrderPlacedData,
     PageViewData,
     PixelMessage,
     ProductClickData,
@@ -49,6 +50,7 @@ import { addToWishlist } from './events/3_4__addToWishlist'
 import { addToCart } from './events/3_5__addToCart'
 import { cartImpression } from './events/4_1__cartImpression'
 import { removeFromCart } from './events/4_2__removeFromCart'
+import { handleOrderPlacedPage } from './events/orderPlaced'
 
 let domClickListenerAttached = false
 
@@ -118,6 +120,16 @@ export const handleEvents = (e: PixelMessage) => {
             // 2.4.1 Promotion impressions — after analytics_loaded
             promotionImpression()
 
+            // 5.4.1 & 5.4.2 Order placed — IO storefront, not checkout6-custom.js
+            void handleOrderPlacedPage(data.pageUrl)
+
+            break
+        }
+
+        case 'vtex:orderPlaced': {
+            const data = e.data as OrderPlacedData
+
+            void handleOrderPlacedPage(window.location.href, data)
             break
         }
 

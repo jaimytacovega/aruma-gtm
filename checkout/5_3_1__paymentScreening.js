@@ -9,6 +9,22 @@
     global.location.pathname.includes('/checkout') &&
     global.location.hash.includes('/payment')
 
+  const hasPaymentVirtualPageInDataLayer = () => {
+    const dataLayer = global.dataLayer || []
+
+    return dataLayer.some((entry) => {
+      if (!entry || entry.event !== 'virtualPage') {
+        return false
+      }
+
+      if (entry.checkout_screen === PAYMENT_CHECKOUT_SCREEN) {
+        return true
+      }
+
+      return entry.page_title === PAYMENT_PAGE_TITLE
+    })
+  }
+
   global.create5_3_1__paymentScreening = ({
     pushToDataLayer,
     ensureCheckoutScreening,
@@ -29,6 +45,28 @@
     const getPaymentPageLocation = () =>
       `${global.location.origin}/checkout/pago`
 
+    const buildPaymentVirtualPagePayload = () => ({
+      event: 'virtualPage',
+      page_location: getPaymentPageLocation(),
+      page_title: PAYMENT_PAGE_TITLE,
+      checkout_screen: PAYMENT_CHECKOUT_SCREEN,
+    })
+
+    const pushPaymentVirtualPage = () => {
+      pushToDataLayer(buildPaymentVirtualPagePayload())
+    }
+
+    const ensurePaymentVirtualPage = () => {
+      if (hasPaymentVirtualPageInDataLayer()) {
+        return false
+      }
+
+      ensurePriorCheckoutScreens()
+      pushPaymentVirtualPage()
+
+      return true
+    }
+
     const pushPaymentScreeningVirtualPage = () => {
       if (!isCheckoutPaymentPage()) {
         return
@@ -44,12 +82,7 @@
 
       lastVirtualPageUrl = pageUrl
 
-      pushToDataLayer({
-        event: 'virtualPage',
-        page_location: pageUrl,
-        page_title: PAYMENT_PAGE_TITLE,
-        checkout_screen: PAYMENT_CHECKOUT_SCREEN,
-      })
+      pushPaymentVirtualPage()
     }
 
     const onHashChange = () => {
@@ -66,6 +99,10 @@
       global.addEventListener('hashchange', onHashChange)
     }
 
-    return attach
+    return {
+      attach,
+      ensurePaymentVirtualPage,
+      hasPaymentVirtualPageInDataLayer,
+    }
   }
 })(window)
