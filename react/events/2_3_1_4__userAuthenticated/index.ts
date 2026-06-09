@@ -1,5 +1,6 @@
 import { canUseDOM } from 'vtex.render-runtime'
 
+import { withHashedUserPii } from '../../hashPii'
 import {
     pushToDataLayer,
     setAwaitingLogin,
@@ -110,10 +111,14 @@ const userAuthenticated = (data: UserData) => {
             email: data.email,
         },
         (userProperties) => {
-            pushToDataLayer({
-                event: 'userProperties',
-                ...userProperties,
-            })
+            void (async () => {
+                const hashed = await withHashedUserPii(userProperties)
+
+                pushToDataLayer({
+                    event: 'userProperties',
+                    ...hashed,
+                })
+            })()
         }
     )
 }

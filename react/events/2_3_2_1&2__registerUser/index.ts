@@ -1,5 +1,6 @@
 import { canUseDOM } from 'vtex.render-runtime'
 
+import { withHashedUserPii } from '../../hashPii'
 import {
     NOT_AVAILABLE,
     clearAwaitingRegisterUserProperties,
@@ -161,14 +162,20 @@ const pushRegisterSuccessEvents = () => {
 }
 
 const pushRegisterUserProperties = (data: UserData) => {
-    pushToDataLayer({
-        event: 'userProperties',
-        userID: data.document || NOT_AVAILABLE,
-        correo: data.email || NOT_AVAILABLE,
-        edadUsuario: NOT_AVAILABLE,
-        magentaUser: NOT_AVAILABLE,
-        magentaPointsUser: NOT_AVAILABLE,
-    })
+    void (async () => {
+        const hashed = await withHashedUserPii({
+            userID: data.document || NOT_AVAILABLE,
+            correo: data.email || NOT_AVAILABLE,
+            edadUsuario: NOT_AVAILABLE,
+            magentaUser: NOT_AVAILABLE,
+            magentaPointsUser: NOT_AVAILABLE,
+        })
+
+        pushToDataLayer({
+            event: 'userProperties',
+            ...hashed,
+        })
+    })()
 }
 
 const syncRegisterStep1 = () => {
