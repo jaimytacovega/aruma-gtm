@@ -175,7 +175,7 @@ const pushToDataLayer = (payload: Record<string, unknown>, disableLog: boolean =
     }
 
     window.dataLayer = window.dataLayer || []
-    window.dataLayer.push(payload)
+    window.dataLayer.push({ ...payload, arumaGtm: true })
     persistListContextFromPayload(payload)
     if (!disableLog) {
         log(JSON.stringify(payload))

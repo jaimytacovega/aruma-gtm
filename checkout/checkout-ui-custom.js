@@ -177,7 +177,7 @@
   const orderFormUtils = window.createCheckoutOrderFormUtils(NOT_AVAILABLE)
 
   const pushToDataLayer = (payload) => {
-    window.dataLayer.push(payload)
+    window.dataLayer.push({ ...payload, arumaGtm: true })
     listContextStore.persistListContextFromPayload(payload)
     log(JSON.stringify(payload))
   }
