@@ -2,9 +2,6 @@
  * Checkout cart (#/cart): view_cart. Paste after checkoutOrderFormUtils.js.
  */
 ;((global) => {
-  const LIST_ID = 'view_cart'
-  const LIST_NAME = 'View cart'
-
   const isCheckoutCartPage = () => {
     if (!global.location.pathname.includes('/checkout')) {
       return false
@@ -52,8 +49,7 @@
         const currency = orderFormUtils.getCurrency(orderForm)
         const items = await enrichOrderFormItems(
           orderForm.items,
-          LIST_ID,
-          LIST_NAME
+          orderFormUtils
         )
 
         pushToDataLayer(buildViewCartPayload(items, currency))

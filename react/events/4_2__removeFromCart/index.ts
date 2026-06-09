@@ -1,14 +1,12 @@
-import { log, pushToDataLayer } from '../../utils'
+import { pushToDataLayer } from '../../utils'
 import type { RemoveToCartData } from '../../typings/events'
 
 import { buildRemoveFromCartPayload } from '../3_1__productImpression/catalog'
-import { enrichCartItems } from '../cartItems'
+import { enrichCartItemsWithStoredListContext } from '../cartItems'
 
 const removeFromCart = async (data: RemoveToCartData) => {
-  const items = await enrichCartItems(
+  const items = await enrichCartItemsWithStoredListContext(
     data.items,
-    'remove_from_cart',
-    'Remove from cart',
     'remove from cart'
   )
 

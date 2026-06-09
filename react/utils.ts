@@ -1,5 +1,11 @@
 import { canUseDOM } from 'vtex.render-runtime'
 
+import {
+    getListContextFromStore,
+    persistListContextFromPayload,
+} from './listContextStore'
+import type { ProductListContext } from './listContextStore'
+
 const log = (...args: unknown[]) => console.info('[aruma-gtm]', ...args)
 const NOT_AVAILABLE = '(not available)'
 
@@ -11,11 +17,6 @@ const LOGIN_MODAL_INTERACTION_SELECTOR = [
 
 const isInsideLoginModalInteraction = (target: Element): boolean =>
     Boolean(target.closest(LOGIN_MODAL_INTERACTION_SELECTOR))
-
-type ProductListContext = {
-    listId: string
-    listName: string
-}
 
 const normalizeProductKey = (value: string): string => {
     try {
@@ -58,7 +59,9 @@ const selectItemMatchesProduct = (
     return false
 }
 
-const readSelectItemList = (
+const LIST_CONTEXT_EVENTS = new Set(['select_item', 'view_item_list'])
+
+const readListContextFromEcommerce = (
     entry: Record<string, unknown>
 ): ProductListContext | null => {
     const ecommerce = entry.ecommerce as Record<string, unknown> | undefined
@@ -80,7 +83,48 @@ const readSelectItemList = (
     }
 }
 
-/** PDP list context: last select_item for this product, else last select_item, else fallback. */
+const listEventMatchesProduct = (
+    entry: Record<string, unknown>,
+    slug: string,
+    productId?: string
+): boolean => {
+    if (entry.event === 'select_item') {
+        return selectItemMatchesProduct(entry, slug, productId)
+    }
+
+    if (entry.event !== 'view_item_list') {
+        return false
+    }
+
+    const ecommerce = entry.ecommerce as Record<string, unknown> | undefined
+    const items = ecommerce?.items
+
+    if (!Array.isArray(items)) {
+        return false
+    }
+
+    const slugKey = normalizeProductKey(slug)
+    const productIdKey = productId
+        ? normalizeProductKey(String(productId))
+        : ''
+
+    for (const raw of items) {
+        if (!raw || typeof raw !== 'object') {
+            continue
+        }
+
+        const item = raw as Record<string, unknown>
+        const itemId = normalizeProductKey(String(item.item_id ?? ''))
+
+        if (itemId === slugKey || (productIdKey && itemId === productIdKey)) {
+            return true
+        }
+    }
+
+    return false
+}
+
+/** List context from last select_item / view_item_list for this product, else last list event. */
 const getListFromLastSelectItem = (
     slug: string,
     productId?: string,
@@ -94,117 +138,35 @@ const getListFromLastSelectItem = (
     }
 
     window.dataLayer = window.dataLayer || []
-    let lastSelectItemList: ProductListContext | null = null
+    let lastListContext: ProductListContext | null = null
 
     for (let index = window.dataLayer.length - 1; index >= 0; index -= 1) {
         const entry = window.dataLayer[index]
 
-        if (!entry || entry.event !== 'select_item') {
+        if (!entry || !LIST_CONTEXT_EVENTS.has(String(entry.event))) {
             continue
         }
 
-        const list = readSelectItemList(entry)
+        const list = readListContextFromEcommerce(entry)
 
         if (!list) {
             continue
         }
 
-        if (!lastSelectItemList) {
-            lastSelectItemList = list
+        if (!lastListContext) {
+            lastListContext = list
         }
 
-        if (selectItemMatchesProduct(entry, slug, productId)) {
+        if (listEventMatchesProduct(entry, slug, productId)) {
             return list
         }
     }
 
-    return lastSelectItemList ?? fallback
-}
-
-const CHECKOUT_LIST_CONTEXT_KEY = 'aruma-gtm:checkout-list-context'
-const MAX_CHECKOUT_PRODUCT_ENTRIES = 50
-
-type CheckoutListContextStore = {
-    last: ProductListContext | null
-    byProduct: Record<string, ProductListContext>
-}
-
-const readCheckoutListStore = (): CheckoutListContextStore => {
-    try {
-        const raw = window.localStorage.getItem(CHECKOUT_LIST_CONTEXT_KEY)
-
-        if (raw) {
-            return JSON.parse(raw) as CheckoutListContextStore
-        }
-    } catch {
-        // localStorage unavailable or corrupt
+    if (lastListContext) {
+        return lastListContext
     }
 
-    return { last: null, byProduct: {} }
-}
-
-const writeCheckoutListStore = (store: CheckoutListContextStore) => {
-    try {
-        const keys = Object.keys(store.byProduct)
-
-        if (keys.length > MAX_CHECKOUT_PRODUCT_ENTRIES) {
-            const trimmed = keys.slice(-MAX_CHECKOUT_PRODUCT_ENTRIES)
-            const byProduct: Record<string, ProductListContext> = {}
-
-            for (const key of trimmed) {
-                byProduct[key] = store.byProduct[key]
-            }
-
-            store.byProduct = byProduct
-        }
-
-        window.localStorage.setItem(
-            CHECKOUT_LIST_CONTEXT_KEY,
-            JSON.stringify(store)
-        )
-    } catch {
-        // localStorage unavailable or full
-    }
-}
-
-/** Storefront select_item → localStorage for checkout cart +/- after full page reload. */
-const persistSelectItemForCheckout = (payload: Record<string, unknown>) => {
-    if (payload.event !== 'select_item') {
-        return
-    }
-
-    const list = readSelectItemList(payload)
-
-    if (!list) {
-        return
-    }
-
-    const store = readCheckoutListStore()
-    const value = list.listName || list.listId
-
-    store.last = {
-        listId: value,
-        listName: value,
-    }
-
-    const items = (payload.ecommerce as Record<string, unknown> | undefined)?.items
-
-    if (Array.isArray(items)) {
-        for (const raw of items) {
-            if (!raw || typeof raw !== 'object') {
-                continue
-            }
-
-            const item = raw as Record<string, unknown>
-            const productKey = normalizeProductKey(String(item.item_id ?? ''))
-
-            if (productKey) {
-                store.byProduct[productKey] = store.last
-            }
-        }
-    }
-
-    writeCheckoutListStore(store)
+    return getListContextFromStore(slug, productId, fallback)
 }
 
 const pushToDataLayer = (payload: Record<string, unknown>, disableLog: boolean = false) => {
@@ -214,7 +176,7 @@ const pushToDataLayer = (payload: Record<string, unknown>, disableLog: boolean =
 
     window.dataLayer = window.dataLayer || []
     window.dataLayer.push(payload)
-    persistSelectItemForCheckout(payload)
+    persistListContextFromPayload(payload)
     if (!disableLog) {
         log(JSON.stringify(payload))
     }

@@ -185,12 +185,10 @@
       try {
         const { item, addedQty } = result
         const currency = orderFormUtils.getCurrency(orderForm)
-        const { listId, listName } = orderFormUtils.getListContextForOrderItem(item)
         const itemForEnrich = { ...item, quantity: addedQty }
         const items = await enrichOrderFormItems(
           [itemForEnrich],
-          listId,
-          listName
+          orderFormUtils
         )
 
         pushToDataLayer(buildAddToCartPayload(items, currency))

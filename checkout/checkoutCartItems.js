@@ -260,9 +260,11 @@
     return raw / 100
   }
 
-  const enrichOrderFormItems = async (orderItems, listId, listName) =>
+  const enrichOrderFormItems = async (orderItems, orderFormUtils) =>
     Promise.all(
       orderItems.map(async (orderItem, index) => {
+        const { listId, listName } =
+          orderFormUtils.getListContextForOrderItem(orderItem)
         const catalogSlug = getSlugFromDetailUrl(orderItem.detailUrl)
         const slug = catalogSlug || orderItem.productId
         let catalog = null

@@ -7,23 +7,24 @@
  * Deploy (separate files, paste in order):
  * 1. checkout/4_3__cartPickButtons.js
  * 2. checkout/5_1_1__checkoutScreening.js
- * 3. checkout/checkoutCartItems.js
- * 4. checkout/checkoutOrderFormUtils.js
- * 5. checkout/3_5__addToCart.js
- * 6. checkout/4_2__removeFromCart.js
- * 7. checkout/4_1__cartImpression.js
- * 8. checkout/5_1_2__startCheckout.js
- * 9. checkout/5_1_3__companyInfo.js
- * 10. checkout/5_1_4__submitCompanyInfo.js
- * 11. checkout/5_2_1__shippingScreening.js
- * 12. checkout/5_2_2__submitShipping.js
- * 13. checkout/5_2_3__shippingPickButton.js
- * 14. checkout/5_3_1__paymentScreening.js
- * 15. checkout/5_3_2__paymentInfo.js
- * 16. checkout/5_3_3__paymentPickButton.js
- * 17. checkout/5_4_1__successPaymentScreening.js
- * 18. checkout/5_4_2__successPayment.js
- * 19. This file
+ * 3. checkout/listContextStore.js
+ * 4. checkout/checkoutCartItems.js
+ * 5. checkout/checkoutOrderFormUtils.js
+ * 6. checkout/3_5__addToCart.js
+ * 7. checkout/4_2__removeFromCart.js
+ * 8. checkout/4_1__cartImpression.js
+ * 9. checkout/5_1_2__startCheckout.js
+ * 10. checkout/5_1_3__companyInfo.js
+ * 11. checkout/5_1_4__submitCompanyInfo.js
+ * 12. checkout/5_2_1__shippingScreening.js
+ * 13. checkout/5_2_2__submitShipping.js
+ * 14. checkout/5_2_3__shippingPickButton.js
+ * 15. checkout/5_3_1__paymentScreening.js
+ * 16. checkout/5_3_2__paymentInfo.js
+ * 17. checkout/5_3_3__paymentPickButton.js
+ * 18. checkout/5_4_1__successPaymentScreening.js
+ * 19. checkout/5_4_2__successPayment.js
+ * 20. This file
  */
 ;(() => {
   if (window.__arumaGtmCheckoutInitialized) {
@@ -40,6 +41,13 @@
   if (typeof window.create5_1_1__checkoutScreening !== 'function') {
     console.error(
       '[aruma-gtm] Missing create5_1_1__checkoutScreening. Paste checkout/5_1_1__checkoutScreening.js first.'
+    )
+    return
+  }
+
+  if (typeof window.createListContextStore !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing createListContextStore. Paste checkout/listContextStore.js first.'
     )
     return
   }
@@ -164,8 +172,13 @@
     console.info('[aruma-gtm]', ...args)
   }
 
+  const { NOT_AVAILABLE, enrichOrderFormItems } = window.createCheckoutCartItems()
+  const listContextStore = window.createListContextStore(NOT_AVAILABLE)
+  const orderFormUtils = window.createCheckoutOrderFormUtils(NOT_AVAILABLE)
+
   const pushToDataLayer = (payload) => {
     window.dataLayer.push(payload)
+    listContextStore.persistListContextFromPayload(payload)
     log(JSON.stringify(payload))
   }
 
@@ -217,9 +230,6 @@
     normalizeText,
   })
 
-  const { NOT_AVAILABLE, enrichOrderFormItems } = window.createCheckoutCartItems()
-  const orderFormUtils = window.createCheckoutOrderFormUtils(NOT_AVAILABLE)
-
   const checkoutScreening = window.create5_1_1__checkoutScreening({
     pushToDataLayer,
   })
@@ -247,6 +257,7 @@
   const startCheckout = window.create5_1_2__startCheckout({
     pushToDataLayer,
     enrichOrderFormItems,
+    orderFormUtils,
     NOT_AVAILABLE,
   })
 
@@ -268,6 +279,7 @@
   const submitShipping = window.create5_2_2__submitShipping({
     pushToDataLayer,
     enrichOrderFormItems,
+    orderFormUtils,
     normalizeText,
     NOT_AVAILABLE,
   })

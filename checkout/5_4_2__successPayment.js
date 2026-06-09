@@ -99,8 +99,7 @@
       try {
         items = await enrichOrderFormItems(
           orderForm.items,
-          'purchase',
-          'Purchase'
+          orderFormUtils
         )
       } catch (error) {
         log('enrichOrderFormItems failed', error)

@@ -12,6 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const SOURCES = [
   '4_3__cartPickButtons.js',
   '5_1_1__checkoutScreening.js',
+  'listContextStore.js',
   'checkoutCartItems.js',
   'checkoutOrderFormUtils.js',
   '3_5__addToCart.js',

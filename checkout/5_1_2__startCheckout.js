@@ -15,6 +15,7 @@
   global.create5_1_2__startCheckout = ({
     pushToDataLayer,
     enrichOrderFormItems,
+    orderFormUtils,
     NOT_AVAILABLE,
   }) => {
     let beginCheckoutFired = false
@@ -57,8 +58,7 @@
 
       const items = await enrichOrderFormItems(
         orderForm.items,
-        'begin_checkout',
-        'Begin checkout'
+        orderFormUtils
       )
 
       pushToDataLayer(buildBeginCheckoutPayload(items, currency, coupon))

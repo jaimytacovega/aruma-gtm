@@ -56,6 +56,7 @@
   global.create5_2_2__submitShipping = ({
     pushToDataLayer,
     enrichOrderFormItems,
+    orderFormUtils,
     normalizeText,
     NOT_AVAILABLE,
   }) => {
@@ -161,8 +162,7 @@
 
       const items = await enrichOrderFormItems(
         orderForm.items,
-        'add_shipping_info',
-        'Add shipping info'
+        orderFormUtils
       )
 
       pushToDataLayer(

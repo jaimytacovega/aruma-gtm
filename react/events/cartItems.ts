@@ -1,7 +1,9 @@
-import { log } from '../utils'
+import { saveListContextForProduct } from '../listContextStore'
+import { getListFromLastSelectItem, log } from '../utils'
 import type { AddToCartData } from '../typings/events'
 
 import { buildViewItem, fetchCatalogProduct } from './3_1__productImpression/catalog'
+import type { ViewItem } from './3_1__productImpression/catalog'
 
 export type VtexCartItem = AddToCartData['items'][number]
 
@@ -68,3 +70,39 @@ export const enrichCartItems = async (
       }
     })
   )
+
+/** Per-item list context from impression / select_item (dataLayer + localStorage). */
+export const enrichCartItemsWithStoredListContext = async (
+  cartItems: VtexCartItem[],
+  logContext: string
+) => {
+  const items: Array<ViewItem & { quantity: number }> = []
+
+  for (const cartItem of cartItems) {
+    const slug = getSlugFromCartItem(cartItem)
+    const { listId, listName } = getListFromLastSelectItem(
+      slug,
+      cartItem.productId
+    )
+
+    saveListContextForProduct({
+      slug,
+      productId: cartItem.productId,
+      listId,
+      listName,
+    })
+
+    const enriched = await enrichCartItems(
+      [cartItem],
+      listId,
+      listName,
+      logContext
+    )
+
+    for (const item of enriched) {
+      items.push(item)
+    }
+  }
+
+  return items
+}

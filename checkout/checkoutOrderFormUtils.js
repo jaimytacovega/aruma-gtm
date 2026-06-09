@@ -360,85 +360,23 @@
       return match?.[1] ?? ''
     }
 
-    const normalizeProductKey = (value) => {
-      try {
-        return decodeURIComponent(value).trim().toLowerCase()
-      } catch {
-        return String(value).trim().toLowerCase()
-      }
-    }
+    const listContextStore = global.createListContextStore(NOT_AVAILABLE)
 
-    const CHECKOUT_LIST_CONTEXT_KEY = 'aruma-gtm:checkout-list-context'
-
-    const normalizeListContext = (list) => {
-      const value = String(list?.listName || list?.listId || '').trim()
-
-      if (!value) {
-        return null
-      }
-
-      return {
-        listId: value,
-        listName: value,
-      }
-    }
-
-    const readCheckoutListStore = () => {
-      try {
-        const raw = global.localStorage?.getItem(CHECKOUT_LIST_CONTEXT_KEY)
-
-        if (raw) {
-          return JSON.parse(raw)
-        }
-      } catch {
-        // localStorage unavailable or corrupt
-      }
-
-      return { last: null, byProduct: {} }
-    }
-
-    const getListFromLastSelectItem = (slug, productId) => {
-      const fallback = {
-        listId: NOT_AVAILABLE,
-        listName: NOT_AVAILABLE,
-      }
-
-      const store = readCheckoutListStore()
-      const slugKey = normalizeProductKey(slug)
-      const productIdKey = productId
-        ? normalizeProductKey(String(productId))
-        : ''
-
-      if (slugKey && store.byProduct?.[slugKey]) {
-        return normalizeListContext(store.byProduct[slugKey]) ?? fallback
-      }
-
-      if (productIdKey && store.byProduct?.[productIdKey]) {
-        return normalizeListContext(store.byProduct[productIdKey]) ?? fallback
-      }
-
-      if (store.last) {
-        return normalizeListContext(store.last) ?? fallback
-      }
-
-      return fallback
-    }
-
-    const clearCheckoutListContext = () => {
-      try {
-        global.localStorage?.removeItem(CHECKOUT_LIST_CONTEXT_KEY)
-      } catch {
-        // localStorage unavailable
-      }
-    }
+    const getListFromLastSelectItem = (slug, productId) =>
+      listContextStore.getListContextForProduct({ slug, productId })
 
     const getListContextForOrderItem = (orderItem) => {
       const slug =
         getSlugFromDetailUrl(orderItem?.detailUrl) ||
         String(orderItem?.productId ?? '')
 
-      return getListFromLastSelectItem(slug, orderItem?.productId)
+      return listContextStore.getListContextForProduct({
+        slug,
+        productId: orderItem?.productId,
+      })
     }
+
+    const clearCheckoutListContext = () => listContextStore.clearListContextStore()
 
     return {
       isCheckoutPaymentPage,

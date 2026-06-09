@@ -102,8 +102,7 @@
 
       const items = await enrichOrderFormItems(
         orderForm.items,
-        'add_payment_info',
-        'Add payment info'
+        orderFormUtils
       )
 
       const totals = orderFormUtils.buildItemsEcommerceTotals(items)

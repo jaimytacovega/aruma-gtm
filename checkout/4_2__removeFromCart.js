@@ -229,12 +229,10 @@
       try {
         const { item, removedQty } = result
         const currency = orderFormUtils.getCurrency(orderForm)
-        const { listId, listName } = orderFormUtils.getListContextForOrderItem(item)
         const itemForEnrich = { ...item, quantity: removedQty }
         const items = await enrichOrderFormItems(
           [itemForEnrich],
-          listId,
-          listName
+          orderFormUtils
         )
 
         pushToDataLayer(buildRemoveFromCartPayload(items, currency))

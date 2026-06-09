@@ -2,7 +2,7 @@ import { log, NOT_AVAILABLE, pushToDataLayer } from '../../utils'
 import type { OrderPlacedData, ProductOrder } from '../../typings/events'
 
 import type { ViewItem } from '../3_1__productImpression/catalog'
-import { enrichCartItems } from '../cartItems'
+import { enrichCartItemsWithStoredListContext } from '../cartItems'
 import type { VtexCartItem } from '../cartItems'
 import {
   claimOrderPlacedEvent,
@@ -118,10 +118,8 @@ const runPurchaseFromLoadedOrder = async (order: LoadedOrderPlacedOrder) => {
 
   purchaseInFlight = true
 
-  const items = await enrichCartItems(
+  const items = await enrichCartItemsWithStoredListContext(
     order.items.map(mapOrderApiItemToCartItem),
-    'purchase',
-    'Purchase',
     'purchase'
   )
 
@@ -168,10 +166,8 @@ const runPurchaseFromPixelOrder = async (data: OrderPlacedData) => {
     return
   }
 
-  const items = await enrichCartItems(
+  const items = await enrichCartItemsWithStoredListContext(
     cartItems,
-    'purchase',
-    'Purchase',
     'purchase'
   )
 
