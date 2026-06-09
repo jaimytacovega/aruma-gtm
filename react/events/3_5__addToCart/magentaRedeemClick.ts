@@ -6,10 +6,20 @@ import type { VtexCartItem } from '../cartItems'
 const PENDING_TIMEOUT_MS = 8000
 const POLL_INTERVAL_MS = 250
 
-const MAGENTA_REDEEM_BUTTON_SELECTOR = [
-  '[class*="flexColChild--buyButtonPdp"] button.vtex-button',
-  '[class*="flexRowContent--productMagenta"] button.vtex-button',
+const MAGENTA_REDEEM_PDP_CONTEXT_SELECTOR = [
+  '[class*="flexColChild--buyButtonPdp"]',
+  '[class*="flexRowContent--productMagenta"]',
 ].join(', ')
+
+const MAGENTA_REDEEM_SHELF_CONTEXT_SELECTOR = [
+  '[class*="flexColChild--quantityBuyButton"]',
+  '[class*="flexRowContent--magenta-points"]',
+  '[class*="flexRow--magenta-points"]',
+  '[class*="flexRowContent--BuyButton"]',
+].join(', ')
+
+const PRODUCT_SUMMARY_SELECTOR =
+  'section[class*="product-summary"][class*="container"], section.vtex-product-summary-2-x-container'
 
 type OrderFormSnapshot = {
   bySku: Map<string, number>
@@ -59,6 +69,23 @@ const getSlugFromPathname = (): string => {
 
   return match?.[1] ?? ''
 }
+
+const getSlugFromProductCard = (target: Element): string => {
+  const productCard = target.closest(PRODUCT_SUMMARY_SELECTOR)
+
+  if (!(productCard instanceof HTMLElement)) {
+    return ''
+  }
+
+  const href =
+    productCard.querySelector('a[href*="/p"]')?.getAttribute('href') ?? ''
+  const match = href.match(/\/([^/]+)\/p\/?$/)
+
+  return match?.[1] ?? ''
+}
+
+const getSlugHintFromRedeemTarget = (target: Element): string =>
+  getSlugFromPathname() || getSlugFromProductCard(target)
 
 const snapshotQuantities = (orderForm: VtexOrderForm): OrderFormSnapshot => {
   const bySku = new Map<string, number>()
@@ -210,21 +237,32 @@ const clearPendingRedeem = () => {
   pendingRedeem = null
 }
 
-const isMagentaRedeemButton = (target: Element): boolean => {
-  const button = target.closest(MAGENTA_REDEEM_BUTTON_SELECTOR)
+const isMagentaRedeemButton = (target: Element): HTMLButtonElement | null => {
+  const button = target.closest('button.vtex-button')
 
   if (!(button instanceof HTMLButtonElement)) {
-    return false
+    return null
   }
 
   if (button.hasAttribute('disabled') || button.disabled) {
-    return false
+    return null
   }
 
   const label = button.querySelector('.vtex-button__label')
   const text = normalizeText(label?.textContent || button.textContent)
 
-  return text === 'canjear'
+  if (text !== 'canjear') {
+    return null
+  }
+
+  const inPdpContext = button.closest(MAGENTA_REDEEM_PDP_CONTEXT_SELECTOR)
+  const inShelfContext = button.closest(MAGENTA_REDEEM_SHELF_CONTEXT_SELECTOR)
+
+  if (!inPdpContext && !inShelfContext) {
+    return null
+  }
+
+  return button
 }
 
 const runRedeemAddToCart = async (
@@ -291,7 +329,6 @@ const watchOrderFormAfterRedeemClick = (
     }
 
     if (Date.now() - startedAt >= PENDING_TIMEOUT_MS) {
-      log('magenta redeem add_to_cart timeout')
       clearPendingRedeem()
       return
     }
@@ -305,9 +342,17 @@ const watchOrderFormAfterRedeemClick = (
 }
 
 const onMagentaRedeemClick = async (
-  onAddToCart: (data: AddToCartData) => void | Promise<void>
+  onAddToCart: (data: AddToCartData) => void | Promise<void>,
+  target: Element
 ) => {
   if (pendingRedeem || redeemInFlight) {
+    return
+  }
+
+  const slugHint = getSlugHintFromRedeemTarget(target)
+
+  if (!slugHint) {
+    log('magenta redeem add_to_cart skip: missing product slug')
     return
   }
 
@@ -319,7 +364,7 @@ const onMagentaRedeemClick = async (
 
   pendingRedeem = {
     snapshot: snapshotQuantities(orderForm),
-    slugHint: getSlugFromPathname(),
+    slugHint,
     timeoutId: window.setTimeout(() => {
       log('magenta redeem add_to_cart timeout')
       clearPendingRedeem()
@@ -354,7 +399,7 @@ const bindOrderFormUpdatedListener = (
   })
 }
 
-/** Magenta PDP "Canjear" uses a custom add-to-cart path — no vtex:addToCart pixel. */
+/** Magenta "Canjear" (PDP + bienvenido shelf) — custom add-to-cart, no vtex:addToCart pixel. */
 export const setupMagentaRedeemAddToCartCapture = (
   onAddToCart: (data: AddToCartData) => void | Promise<void>
 ): void => {
@@ -369,11 +414,13 @@ export const setupMagentaRedeemAddToCartCapture = (
         return
       }
 
-      if (!isMagentaRedeemButton(event.target)) {
+      const button = isMagentaRedeemButton(event.target)
+
+      if (!button) {
         return
       }
 
-      void onMagentaRedeemClick(onAddToCart)
+      void onMagentaRedeemClick(onAddToCart, button)
     },
     true
   )
