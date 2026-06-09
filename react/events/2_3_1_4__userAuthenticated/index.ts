@@ -1,11 +1,11 @@
 import { canUseDOM } from 'vtex.render-runtime'
 
 import {
-    NOT_AVAILABLE,
     pushToDataLayer,
     setAwaitingLogin,
 } from '../../utils'
 import type { UserData } from '../../typings/events'
+import { waitForMagentaUserProperties } from '../magentaProfile'
 
 const LOGIN_FORM_SELECTOR = '[class*="emailAndPasswordForm"]'
 
@@ -104,14 +104,18 @@ const userAuthenticated = (data: UserData) => {
         cta: 'Inicio exitoso',
     })
 
-    pushToDataLayer({
-        event: 'userProperties',
-        userID: data.document || NOT_AVAILABLE,
-        correo: data.email || NOT_AVAILABLE,
-        edadUsuario: NOT_AVAILABLE,
-        magentaUser: NOT_AVAILABLE,
-        magentaPointsUser: NOT_AVAILABLE,
-    })
+    waitForMagentaUserProperties(
+        {
+            document: data.document,
+            email: data.email,
+        },
+        (userProperties) => {
+            pushToDataLayer({
+                event: 'userProperties',
+                ...userProperties,
+            })
+        }
+    )
 }
 
 export { userAuthenticated, setupLoginAwaitingCapture }
