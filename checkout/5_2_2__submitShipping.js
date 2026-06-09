@@ -146,18 +146,13 @@
       }
     }
 
-    const completeShippingSubmit = async (orderForm) => {
-      if (!pendingShippingSubmit || !orderForm?.items?.length) {
+    const pushAddShippingInfo = async (orderForm) => {
+      if (!orderForm?.items?.length) {
         return
       }
 
-      clearPending()
-
-      const currency =
-        orderForm.storePreferencesData?.currencyCode ||
-        orderForm.storePreferencesData?.currency ||
-        'PEN'
-      const coupon = orderForm.marketingData?.coupon || NOT_AVAILABLE
+      const currency = orderFormUtils.getCurrency(orderForm)
+      const coupon = orderFormUtils.getCoupon(orderForm)
       const shipping_tier = resolveShippingTier(orderForm)
 
       const items = await enrichOrderFormItems(
@@ -168,6 +163,27 @@
       pushToDataLayer(
         buildAddShippingInfoPayload(items, currency, coupon, shipping_tier)
       )
+    }
+
+    const completeShippingSubmit = async (orderForm) => {
+      if (!pendingShippingSubmit || !orderForm?.items?.length) {
+        return
+      }
+
+      clearPending()
+      await pushAddShippingInfo(orderForm)
+    }
+
+    const runAddShippingInfoFallback = async (orderForm) => {
+      if (!isCheckoutPaymentPage()) {
+        return
+      }
+
+      if (orderFormUtils.hasArumaGtmEventInDataLayer('add_shipping_info')) {
+        return
+      }
+
+      await pushAddShippingInfo(orderForm)
     }
 
     const requestOrderFormAndComplete = () => {
@@ -207,32 +223,47 @@
       startPendingShippingSubmit()
     }
 
-    const handleHashChange = () => {
-      if (!pendingShippingSubmit) {
+    const requestOrderFormAndRunFallback = () => {
+      if (!global.vtexjs?.checkout?.getOrderForm) {
         return
       }
 
+      global.vtexjs.checkout.getOrderForm().done((orderForm) => {
+        void runAddShippingInfoFallback(orderForm)
+      })
+    }
+
+    const handleHashChange = () => {
       if (isCheckoutPaymentPage()) {
-        requestOrderFormAndComplete()
+        if (pendingShippingSubmit) {
+          requestOrderFormAndComplete()
+          return
+        }
+
+        requestOrderFormAndRunFallback()
       }
     }
 
     const handleOrderFormUpdated = (_, orderForm) => {
-      if (!pendingShippingSubmit) {
+      if (pendingShippingSubmit) {
+        if (isCheckoutPaymentPage()) {
+          void completeShippingSubmit(orderForm)
+          return
+        }
+
+        const hasSelectedShipping = (orderForm?.shippingData?.logisticsInfo ?? []).some(
+          (logistics) => Boolean(logistics?.selectedSlaId)
+        )
+
+        if (hasSelectedShipping && !isCheckoutShippingPage()) {
+          void completeShippingSubmit(orderForm)
+        }
+
         return
       }
 
       if (isCheckoutPaymentPage()) {
-        void completeShippingSubmit(orderForm)
-        return
-      }
-
-      const hasSelectedShipping = (orderForm?.shippingData?.logisticsInfo ?? []).some(
-        (logistics) => Boolean(logistics?.selectedSlaId)
-      )
-
-      if (hasSelectedShipping && !isCheckoutShippingPage()) {
-        void completeShippingSubmit(orderForm)
+        void runAddShippingInfoFallback(orderForm)
       }
     }
 
@@ -242,6 +273,10 @@
 
       if (global.jQuery) {
         global.jQuery(global).on('orderFormUpdated.vtex', handleOrderFormUpdated)
+      }
+
+      if (isCheckoutPaymentPage()) {
+        requestOrderFormAndRunFallback()
       }
     }
 

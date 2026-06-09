@@ -13,7 +13,7 @@
     const dataLayer = global.dataLayer || []
 
     return dataLayer.some((entry) => {
-      if (!entry || entry.event !== 'virtualPage') {
+      if (!entry || entry.arumaGtm !== true || entry.event !== 'virtualPage') {
         return false
       }
 

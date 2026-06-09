@@ -1,5 +1,6 @@
 /**
- * Checkout identification (#/profile, #/email): begin_checkout. Paste after checkoutCartItems.js.
+ * Checkout flow: begin_checkout on #/profile, #/email, and fallbacks on #/shipping / #/payment.
+ * Paste after checkoutCartItems.js.
  */
 ;((global) => {
   const isCheckoutIdentificationPage = () => {
@@ -12,13 +13,26 @@
     return hash.includes('/profile') || hash.includes('/email')
   }
 
+  const isCheckoutShippingPage = () =>
+    global.location.pathname.includes('/checkout') &&
+    global.location.hash.includes('/shipping')
+
+  const isCheckoutPaymentPage = () =>
+    global.location.pathname.includes('/checkout') &&
+    global.location.hash.includes('/payment')
+
+  const isCheckoutBeginCheckoutPage = () =>
+    isCheckoutIdentificationPage() ||
+    isCheckoutShippingPage() ||
+    isCheckoutPaymentPage()
+
   global.create5_1_2__startCheckout = ({
     pushToDataLayer,
     enrichOrderFormItems,
     orderFormUtils,
     NOT_AVAILABLE,
   }) => {
-    let beginCheckoutFired = false
+    let identificationBeginCheckoutFiredForHash = ''
 
     const buildBeginCheckoutPayload = (items, currency, coupon) => {
       const value = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -39,8 +53,20 @@
       }
     }
 
+    const shouldFireBeginCheckout = () => {
+      if (isCheckoutIdentificationPage()) {
+        return identificationBeginCheckoutFiredForHash !== global.location.hash
+      }
+
+      if (isCheckoutShippingPage() || isCheckoutPaymentPage()) {
+        return !orderFormUtils.hasArumaGtmEventInDataLayer('begin_checkout')
+      }
+
+      return false
+    }
+
     const runStartCheckout = async (orderForm) => {
-      if (!isCheckoutIdentificationPage() || beginCheckoutFired) {
+      if (!isCheckoutBeginCheckoutPage() || !shouldFireBeginCheckout()) {
         return
       }
 
@@ -48,13 +74,12 @@
         return
       }
 
-      beginCheckoutFired = true
+      if (isCheckoutIdentificationPage()) {
+        identificationBeginCheckoutFiredForHash = global.location.hash
+      }
 
-      const currency =
-        orderForm.storePreferencesData?.currencyCode ||
-        orderForm.storePreferencesData?.currency ||
-        'PEN'
-      const coupon = orderForm.marketingData?.coupon || NOT_AVAILABLE
+      const currency = orderFormUtils.getCurrency(orderForm)
+      const coupon = orderFormUtils.getCoupon(orderForm)
 
       const items = await enrichOrderFormItems(
         orderForm.items,
@@ -76,11 +101,15 @@
 
     const onHashChange = () => {
       if (!global.location.pathname.includes('/checkout')) {
-        beginCheckoutFired = false
+        identificationBeginCheckoutFiredForHash = ''
         return
       }
 
-      if (isCheckoutIdentificationPage()) {
+      if (!isCheckoutIdentificationPage()) {
+        identificationBeginCheckoutFiredForHash = ''
+      }
+
+      if (isCheckoutBeginCheckoutPage()) {
         requestOrderForm()
       }
     }

@@ -378,7 +378,16 @@
 
     const clearCheckoutListContext = () => listContextStore.clearListContextStore()
 
+    const hasArumaGtmEventInDataLayer = (eventName) => {
+      const dataLayer = global.dataLayer || []
+
+      return dataLayer.some(
+        (entry) => entry?.arumaGtm === true && entry.event === eventName
+      )
+    }
+
     return {
+      hasArumaGtmEventInDataLayer,
       isCheckoutPaymentPage,
       isCheckoutOrderPlacedPage,
       getOrderGroupFromUrl,
