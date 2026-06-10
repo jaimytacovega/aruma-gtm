@@ -343,6 +343,21 @@ export const fetchCatalogProduct = async (
   }
 }
 
+const resolveMagentaPointsPrice = (
+  sellingPrice: number,
+  listPrice: number,
+  visiblePrice: number
+): number => {
+  const price =
+    sellingPrice > 0
+      ? sellingPrice
+      : listPrice > 0
+        ? listPrice
+        : visiblePrice
+
+  return Number(price.toFixed(2))
+}
+
 export const buildViewItem = (
   visible: VisibleSnapshot,
   catalog: CatalogProduct | null
@@ -357,7 +372,7 @@ export const buildViewItem = (
       : 0
   const isMagentaPoints = isMagentaPointsProduct(catalog, visible.categories)
   const magentaPointsPrice = isMagentaPoints
-    ? Number(sellingPrice.toFixed(2))
+    ? resolveMagentaPointsPrice(sellingPrice, listPrice, visible.price)
     : 0
   const itemPrice = isMagentaPoints
     ? 0

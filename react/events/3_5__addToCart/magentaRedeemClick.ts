@@ -57,12 +57,42 @@ let captureAttached = false
 let pendingRedeem: {
   snapshot: OrderFormSnapshot
   slugHint: string
+  magentaPointsPrice: number
   timeoutId: number
 } | null = null
 let redeemInFlight = false
 
 const normalizeText = (value: string | null | undefined): string =>
   value?.replace(/\s+/g, ' ').trim().toLowerCase() || ''
+
+const parsePrice = (value: string): number => {
+  const cleaned = value.replace(/[^\d.,]/g, '').replace(',', '.')
+
+  if (!cleaned) {
+    return 0
+  }
+
+  const parsed = Number.parseFloat(cleaned)
+
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const getMagentaPointsPriceFromDom = (button: Element): number => {
+  const scope =
+    button.closest(PRODUCT_SUMMARY_SELECTOR) ??
+    button.closest(MAGENTA_REDEEM_PDP_CONTEXT_SELECTOR) ??
+    button.closest(MAGENTA_REDEEM_SHELF_CONTEXT_SELECTOR)
+
+  if (!scope) {
+    return 0
+  }
+
+  const priceEl = scope.querySelector(
+    '[class*="sellingPrice"], [class*="currencyLiteral"]'
+  )
+
+  return parsePrice((priceEl?.textContent ?? '').replace(/\s+/g, ' ').trim())
+}
 
 const getSlugFromPathname = (): string => {
   const match = window.location.pathname.match(/\/([^/]+)\/p\/?$/)
@@ -153,18 +183,25 @@ const getCurrency = (orderForm: VtexOrderForm): string =>
   orderForm.storePreferencesData?.currency ||
   'PEN'
 
-const mapOrderFormItemToCartItem = (item: VtexOrderFormItem): VtexCartItem => ({
+const mapOrderFormItemToCartItem = (
+  item: VtexOrderFormItem,
+  quantity: number,
+  magentaPointsPrice: number
+): VtexCartItem => ({
   brand: item.additionalInfo?.brandName || '',
   ean: '',
   category: '',
   detailUrl: item.detailUrl || '',
   imageUrl: '',
   name: item.name || '',
-  price: item.sellingPrice ?? item.price ?? 0,
-  priceIsInt: item.priceIsInt ?? true,
+  price:
+    magentaPointsPrice > 0
+      ? magentaPointsPrice
+      : item.sellingPrice ?? item.price ?? 0,
+  priceIsInt: magentaPointsPrice > 0 ? false : item.priceIsInt ?? true,
   productId: String(item.productId ?? ''),
   productRefId: '',
-  quantity: item.quantity ?? 1,
+  quantity,
   seller: '',
   sellerName: '',
   skuId: String(item.id ?? ''),
@@ -289,14 +326,17 @@ const runRedeemAddToCart = async (
     return
   }
 
+  const { magentaPointsPrice } = pendingRedeem
+
   clearPendingRedeem()
   redeemInFlight = true
 
   try {
-    const cartItem = mapOrderFormItemToCartItem({
-      ...result.item,
-      quantity: result.addedQty,
-    })
+    const cartItem = mapOrderFormItemToCartItem(
+      result.item,
+      result.addedQty,
+      magentaPointsPrice
+    )
 
     const data: AddToCartData = {
       event: 'addToCart',
@@ -350,6 +390,7 @@ const onMagentaRedeemClick = async (
   }
 
   const slugHint = getSlugHintFromRedeemTarget(target)
+  const magentaPointsPrice = getMagentaPointsPriceFromDom(target)
 
   if (!slugHint) {
     log('magenta redeem add_to_cart skip: missing product slug')
@@ -365,6 +406,7 @@ const onMagentaRedeemClick = async (
   pendingRedeem = {
     snapshot: snapshotQuantities(orderForm),
     slugHint,
+    magentaPointsPrice,
     timeoutId: window.setTimeout(() => {
       log('magenta redeem add_to_cart timeout')
       clearPendingRedeem()
