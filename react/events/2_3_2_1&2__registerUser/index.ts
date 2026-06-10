@@ -141,13 +141,15 @@ const pushRegisterStep1VirtualPage = () => {
     })
 }
 
-const pushRegisterSuccessEvents = () => {
+const pushRegisterSuccessVirtualPage = () => {
     pushToDataLayer({
         event: 'virtualPage',
         page_location: `${window.location.origin}${REGISTER_SUCCESS_PAGE_PATH}`,
         page_title: REGISTER_SUCCESS_PAGE_TITLE,
     })
+}
 
+const pushRegisterSuccessVirtualEvent = () => {
     pushToDataLayer({
         event: 'virtualEvent',
         portal: 'Aruma',
@@ -159,6 +161,10 @@ const pushRegisterSuccessEvents = () => {
         elemento: 'Modal',
         cta: 'Cuenta exitosa',
     })
+}
+
+const pushRegisterSuccessEvents = () => {
+    pushRegisterSuccessVirtualPage()
 }
 
 const pushRegisterUserProperties = (data: UserData) => {
@@ -228,6 +234,7 @@ const setupRegisterDiscoverMoreCapture = () => {
                 return
             }
 
+            pushRegisterSuccessVirtualEvent()
             setAwaitingRegisterUserProperties()
         },
         true
