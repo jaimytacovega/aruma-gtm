@@ -32,33 +32,15 @@
     return (categories ?? []).map((category) => category.replace(/^\/|\/$/g, ''))
   }
 
-  const clusterLabelIncludesMagentaPoints = (clusters) => {
-    if (!clusters || typeof clusters !== 'object') {
-      return false
-    }
-
-    return Object.values(clusters).some((label) =>
-      String(label).toLowerCase().includes('magenta points')
-    )
-  }
+  const MAGENTA_POINTS_CATEGORY = 'magenta points'
 
   const isMagentaPointsProduct = (catalog) => {
     if (!catalog) {
       return false
     }
 
-    const inMagentaCategory = parseCategoryParts(catalog.categories).some(
-      (part) => part.trim().toLowerCase() === 'magenta points'
-    )
-
-    if (inMagentaCategory) {
-      return true
-    }
-
-    return (
-      clusterLabelIncludesMagentaPoints(catalog.productClusters) ||
-      clusterLabelIncludesMagentaPoints(catalog.searchableClusters) ||
-      clusterLabelIncludesMagentaPoints(catalog.clusterHighlights)
+    return parseCategoryParts(catalog.categories).some(
+      (part) => part.trim().toLowerCase() === MAGENTA_POINTS_CATEGORY
     )
   }
 

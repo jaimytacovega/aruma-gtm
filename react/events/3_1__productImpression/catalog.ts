@@ -159,16 +159,6 @@ const parseCategoryParts = (categories: string[] | undefined): string[] => {
 
 const MAGENTA_POINTS_CATEGORY = 'magenta points'
 
-const clusterLabelIncludesMagentaPoints = (clusters: unknown): boolean => {
-  if (!clusters || typeof clusters !== 'object') {
-    return false
-  }
-
-  return Object.values(clusters as Record<string, unknown>).some((label) =>
-    String(label).toLowerCase().includes('magenta points')
-  )
-}
-
 const categoriesIncludeMagentaPoints = (
   categories: string[] | undefined
 ): boolean =>
@@ -188,15 +178,7 @@ export const isMagentaPointsProduct = (
     return false
   }
 
-  if (categoriesIncludeMagentaPoints(catalog.categories)) {
-    return true
-  }
-
-  return (
-    clusterLabelIncludesMagentaPoints(catalog.productClusters) ||
-    clusterLabelIncludesMagentaPoints(catalog.searchableClusters) ||
-    clusterLabelIncludesMagentaPoints(catalog.clusterHighlights)
-  )
+  return categoriesIncludeMagentaPoints(catalog.categories)
 }
 
 const readSpecification = (
