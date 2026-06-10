@@ -87,9 +87,11 @@ const SHELF_CONTAINER_SELECTOR = '[class*="sliderLayoutContainer"]'
 
 export const MAGENTA_POINTS_LIST_LABEL = 'Magenta Points'
 const MAGENTA_POINTS_BIENVENIDO_PATH = '/magenta-points/bienvenido'
+const MAGENTA_POINTS_PRODUCTOS_PATH = '/productos-magenta'
 
-const isMagentaPointsBienvenidoPage = (): boolean =>
-  window.location.pathname.includes(MAGENTA_POINTS_BIENVENIDO_PATH)
+const isMagentaPointsListPage = (): boolean =>
+  window.location.pathname.includes(MAGENTA_POINTS_BIENVENIDO_PATH) ||
+  window.location.pathname.includes(MAGENTA_POINTS_PRODUCTOS_PATH)
 
 const SEARCH_AUTOCOMPLETE_SELECTOR =
   '[data-af-element="search-autocomplete"][class*="tileList"], [class*="tileList"][data-af-element="search-autocomplete"]'
@@ -208,7 +210,7 @@ export const getListContext = (productEl: HTMLElement): {
     }
   }
 
-  if (isMagentaPointsBienvenidoPage()) {
+  if (isMagentaPointsListPage()) {
     const listRoot =
       productEl.closest(SHELF_CONTAINER_SELECTOR) ??
       productEl.closest('[class*="gallery"]') ??
