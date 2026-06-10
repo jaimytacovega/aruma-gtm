@@ -9,14 +9,16 @@ import {
   getCoupon,
   getCurrency,
   getOrderGroupFromUrl,
-  getOrderShipping,
-  getOrderTax,
   getPaymentType,
+  getPurchaseEcommerceTotals,
   getShippingTier,
   isCheckoutOrderPlacedPage,
   loadOrderPlacedOrder,
 } from '../orderPlaced/orderPlacedUtils'
-import type { LoadedOrderPlacedOrder } from '../orderPlaced/orderPlacedUtils'
+import type {
+  LoadedOrderPlacedOrder,
+  PixelPurchaseTotals,
+} from '../orderPlaced/orderPlacedUtils'
 
 let purchaseInFlight = false
 
@@ -80,21 +82,26 @@ const pushPurchasePayload = async (
   coupon: string,
   payment_type: string,
   shipping_tier: string,
-  tax: number,
-  shipping: number,
-  items: Array<ViewItem & { quantity: number }>
+  order: Parameters<typeof getPurchaseEcommerceTotals>[0],
+  items: Array<ViewItem & { quantity: number }>,
+  pixelTotals?: PixelPurchaseTotals
 ) => {
-  const totals = buildItemsTotals(items)
+  const itemTotals = buildItemsTotals(items)
+  const purchaseTotals = getPurchaseEcommerceTotals(
+    order,
+    itemTotals.value,
+    pixelTotals
+  )
 
   pushToDataLayer({
     event: 'purchase',
     ecommerce: {
       transaction_id: orderGroup,
       currency,
-      value: totals.value,
-      magentaPoints_value: totals.magentaPoints_value,
-      tax,
-      shipping,
+      value: purchaseTotals.value,
+      magentaPoints_value: itemTotals.magentaPoints_value,
+      tax: purchaseTotals.tax,
+      shipping: purchaseTotals.shipping,
       coupon,
       shipping_tier,
       payment_type,
@@ -135,8 +142,7 @@ const runPurchaseFromLoadedOrder = async (order: LoadedOrderPlacedOrder) => {
     getCoupon(order),
     getPaymentType(order),
     getShippingTier(order),
-    getOrderTax(order),
-    getOrderShipping(order),
+    order,
     items
   )
 
@@ -201,9 +207,17 @@ const runPurchaseFromPixelOrder = async (data: OrderPlacedData) => {
     data.coupon || NOT_AVAILABLE,
     payment_type,
     shipping_tier,
-    data.transactionTax ?? 0,
-    data.transactionShipping ?? 0,
-    items
+    {},
+    items,
+    {
+      transactionTotal: data.transactionTotal,
+      transactionTax: data.transactionTax,
+      transactionShipping: data.transactionShipping,
+      productTaxCents: (data.transactionProducts ?? []).reduce(
+        (sum, product) => sum + (product.tax ?? 0),
+        0
+      ),
+    }
   )
 
   log('5_4_2__successPayment pushing purchase from pixel', orderGroup)

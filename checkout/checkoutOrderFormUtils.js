@@ -43,6 +43,172 @@
       return totalizer.value / 100
     }
 
+    const TOTALIZER_TAX_IDS = ['Tax', 'Taxes', 'CustomTax', 'IGV']
+    const TOTALIZER_SHIPPING_IDS = ['Shipping', 'Delivery', 'Frete']
+    const TOTALIZER_NON_TAX_PATTERN =
+      /^(items|shipping|delivery|frete|discounts?)$/i
+    const TOTALIZER_TAX_PATTERN = /tax|igv|impuesto|iva/i
+    const PERU_IGV_RATE = 0.18
+
+    const roundMoney = (value) => Number(value.toFixed(2))
+
+    const getOrderCurrency = (orderForm) =>
+      orderForm?.storePreferencesData?.currencyCode ||
+      orderForm?.storePreferencesData?.currency ||
+      'PEN'
+
+    const normalizeMoneyCents = (value) => {
+      if (!value) {
+        return 0
+      }
+
+      return roundMoney(value / 100)
+    }
+
+    const extractInclusiveTaxFromGross = (grossAmount, currency) => {
+      const code = (currency ?? 'PEN').toUpperCase()
+
+      if (code !== 'PEN' || grossAmount <= 0) {
+        return 0
+      }
+
+      return roundMoney((grossAmount * PERU_IGV_RATE) / (1 + PERU_IGV_RATE))
+    }
+
+    const mergeOrderTotalizers = (orders) => {
+      const byId = new Map()
+
+      for (const order of orders) {
+        for (const entry of order.totalizers ?? []) {
+          if (!entry?.id) {
+            continue
+          }
+
+          byId.set(entry.id, (byId.get(entry.id) ?? 0) + (entry.value ?? 0))
+        }
+      }
+
+      return [...byId.entries()].map(([id, value]) => ({ id, value }))
+    }
+
+    const findTotalizerCents = (totalizers, ids) => {
+      if (!totalizers?.length) {
+        return 0
+      }
+
+      for (const id of ids) {
+        const match = totalizers.find(
+          (entry) => entry.id?.toLowerCase() === id.toLowerCase() && entry.value
+        )
+
+        if (match?.value) {
+          return match.value
+        }
+      }
+
+      return 0
+    }
+
+    const findTotalizerCentsByTaxPattern = (totalizers) => {
+      if (!totalizers?.length) {
+        return 0
+      }
+
+      return totalizers.reduce((sum, entry) => {
+        if (!entry.value) {
+          return sum
+        }
+
+        const id = entry.id ?? ''
+        const name = entry.name ?? ''
+
+        if (
+          TOTALIZER_NON_TAX_PATTERN.test(id) ||
+          TOTALIZER_NON_TAX_PATTERN.test(name)
+        ) {
+          return sum
+        }
+
+        if (TOTALIZER_TAX_PATTERN.test(id) || TOTALIZER_TAX_PATTERN.test(name)) {
+          return sum + entry.value
+        }
+
+        return sum
+      }, 0)
+    }
+
+    const getTaxFromOrderItems = (orderForm) => {
+      let totalCents = 0
+
+      for (const item of orderForm?.items ?? []) {
+        if (item.tax) {
+          totalCents += item.tax
+        }
+      }
+
+      return normalizeMoneyCents(totalCents)
+    }
+
+    const getShippingFromLogisticsInfo = (orderForm) => {
+      let totalCents = 0
+
+      for (const info of orderForm?.shippingData?.logisticsInfo ?? []) {
+        if (info.price) {
+          totalCents += info.price
+          continue
+        }
+
+        const selectedId = info.selectedSlaId || info.selectedSla
+        const sla = info.slas?.find(
+          (entry) => entry.id === selectedId || entry.name === selectedId
+        )
+
+        if (sla?.price) {
+          totalCents += sla.price
+        }
+      }
+
+      return normalizeMoneyCents(totalCents)
+    }
+
+    const getPurchaseEcommerceTotals = (orderForm, itemsSubtotal) => {
+      let tax = normalizeMoneyCents(
+        findTotalizerCents(orderForm?.totalizers, TOTALIZER_TAX_IDS) ||
+          findTotalizerCentsByTaxPattern(orderForm?.totalizers)
+      )
+      let shipping = normalizeMoneyCents(
+        findTotalizerCents(orderForm?.totalizers, TOTALIZER_SHIPPING_IDS)
+      )
+      let value = normalizeMoneyCents(orderForm?.value)
+
+      if (!tax) {
+        tax = getTaxFromOrderItems(orderForm)
+      }
+
+      if (!shipping) {
+        shipping = getShippingFromLogisticsInfo(orderForm)
+      }
+
+      if (!value) {
+        value = roundMoney(itemsSubtotal + shipping + tax)
+      } else if (!shipping && value > itemsSubtotal) {
+        shipping = roundMoney(Math.max(0, value - itemsSubtotal - tax))
+      }
+
+      if (!tax && value > itemsSubtotal + shipping) {
+        tax = roundMoney(value - itemsSubtotal - shipping)
+      }
+
+      if (!tax) {
+        tax = extractInclusiveTaxFromGross(
+          roundMoney(itemsSubtotal + shipping),
+          getOrderCurrency(orderForm)
+        )
+      }
+
+      return { value, tax, shipping }
+    }
+
     const getCurrency = (orderForm) =>
       orderForm?.storePreferencesData?.currencyCode ||
       orderForm?.storePreferencesData?.currency ||
@@ -414,7 +580,7 @@
         items,
         orderGroup: primary.orderGroup || getOrderGroupFromUrl(),
         value: orders.reduce((sum, order) => sum + (order.value || 0), 0),
-        totalizers: primary.totalizers ?? [],
+        totalizers: mergeOrderTotalizers(orders),
         paymentData:
           orders.find((order) => order.paymentData)?.paymentData ??
           primary.paymentData ??
@@ -652,6 +818,7 @@
       setupOrderPlacedTransitionWatcher,
       getTax: (orderForm) => getTotalizerValue(orderForm, 'Tax'),
       getShipping: (orderForm) => getTotalizerValue(orderForm, 'Shipping'),
+      getPurchaseEcommerceTotals,
       buildItemsEcommerceTotals,
       getSlugFromDetailUrl,
       getListFromLastSelectItem,

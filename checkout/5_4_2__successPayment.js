@@ -31,16 +31,17 @@
       payment_type,
       shipping_tier,
       transaction_id,
-      totals
+      itemTotals,
+      purchaseTotals
     ) => ({
       event: 'purchase',
       ecommerce: {
         transaction_id,
         currency,
-        value: totals.value,
-        magentaPoints_value: totals.magentaPoints_value,
-        tax: orderFormUtils.getTax(orderForm),
-        shipping: orderFormUtils.getShipping(orderForm),
+        value: purchaseTotals.value,
+        magentaPoints_value: itemTotals.magentaPoints_value,
+        tax: purchaseTotals.tax,
+        shipping: purchaseTotals.shipping,
         coupon,
         shipping_tier,
         payment_type,
@@ -107,7 +108,11 @@
         return false
       }
 
-      const totals = orderFormUtils.buildItemsEcommerceTotals(items)
+      const itemTotals = orderFormUtils.buildItemsEcommerceTotals(items)
+      const purchaseTotals = orderFormUtils.getPurchaseEcommerceTotals(
+        orderForm,
+        itemTotals.value
+      )
 
       const payload = buildPurchasePayload(
         items,
@@ -117,13 +122,16 @@
         payment_type,
         shipping_tier,
         transaction_id,
-        totals
+        itemTotals,
+        purchaseTotals
       )
 
       log('pushing purchase', {
         transaction_id,
         itemCount: items.length,
-        value: totals.value,
+        value: purchaseTotals.value,
+        tax: purchaseTotals.tax,
+        shipping: purchaseTotals.shipping,
       })
       pushToDataLayer(payload)
 

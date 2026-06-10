@@ -41,6 +41,7 @@ type OrderApiItem = {
   priceIsInt?: boolean
   quantity?: number
   discount?: number
+  tax?: number
 }
 
 type OrderApiOrder = {
@@ -50,7 +51,7 @@ type OrderApiOrder = {
   value?: number
   items?: OrderApiItem[]
   paymentNames?: string[]
-  totalizers?: Array<{ id: string; value: number }>
+  totalizers?: Array<{ id: string; name?: string; value: number }>
   paymentData?: {
     payments?: Array<{
       paymentSystemName?: string
@@ -599,7 +600,7 @@ const buildOrderFromOrders = (
     items,
     orderGroup: primary.orderGroup || orderGroup,
     value: orders.reduce((sum, order) => sum + (order.value ?? 0), 0),
-    totalizers: primary.totalizers ?? [],
+    totalizers: mergeOrderTotalizers(orders),
     paymentData:
       orders.find((order) => order.paymentData)?.paymentData ??
       primary.paymentData,
@@ -622,6 +623,210 @@ export const loadOrderPlacedOrder = async (orderGroup: string) => {
   }
 
   return buildOrderFromOrders(orders, orderGroup)
+}
+
+const TOTALIZER_TAX_IDS = ['Tax', 'Taxes', 'CustomTax', 'IGV']
+const TOTALIZER_SHIPPING_IDS = ['Shipping', 'Delivery', 'Frete']
+const TOTALIZER_NON_TAX_PATTERN =
+  /^(items|shipping|delivery|frete|discounts?)$/i
+const TOTALIZER_TAX_PATTERN = /tax|igv|impuesto|iva/i
+const PERU_IGV_RATE = 0.18
+
+const roundMoney = (value: number) => Number(value.toFixed(2))
+
+const getOrderCurrency = (order: OrderApiOrder) =>
+  order.storePreferencesData?.currencyCode ||
+  order.storePreferencesData?.currency ||
+  'PEN'
+
+const normalizeMoneyCents = (value?: number) => {
+  if (!value) {
+    return 0
+  }
+
+  return roundMoney(value / 100)
+}
+
+const extractInclusiveTaxFromGross = (grossAmount: number, currency?: string) => {
+  const code = (currency ?? 'PEN').toUpperCase()
+
+  if (code !== 'PEN' || grossAmount <= 0) {
+    return 0
+  }
+
+  return roundMoney((grossAmount * PERU_IGV_RATE) / (1 + PERU_IGV_RATE))
+}
+
+const mergeOrderTotalizers = (orders: OrderApiOrder[]) => {
+  const byId = new Map<string, number>()
+
+  for (const order of orders) {
+    for (const entry of order.totalizers ?? []) {
+      if (!entry?.id) {
+        continue
+      }
+
+      byId.set(entry.id, (byId.get(entry.id) ?? 0) + (entry.value ?? 0))
+    }
+  }
+
+  return [...byId.entries()].map(([id, value]) => ({ id, value }))
+}
+
+const findTotalizerCents = (
+  totalizers: Array<{ id: string; name?: string; value: number }> | undefined,
+  ids: string[]
+) => {
+  if (!totalizers?.length) {
+    return 0
+  }
+
+  for (const id of ids) {
+    const match = totalizers.find(
+      (entry) => entry.id?.toLowerCase() === id.toLowerCase() && entry.value
+    )
+
+    if (match?.value) {
+      return match.value
+    }
+  }
+
+  return 0
+}
+
+const findTotalizerCentsByTaxPattern = (
+  totalizers: Array<{ id: string; name?: string; value: number }> | undefined
+) => {
+  if (!totalizers?.length) {
+    return 0
+  }
+
+  return totalizers.reduce((sum, entry) => {
+    if (!entry.value) {
+      return sum
+    }
+
+    const id = entry.id ?? ''
+    const name = entry.name ?? ''
+
+    if (TOTALIZER_NON_TAX_PATTERN.test(id) || TOTALIZER_NON_TAX_PATTERN.test(name)) {
+      return sum
+    }
+
+    if (TOTALIZER_TAX_PATTERN.test(id) || TOTALIZER_TAX_PATTERN.test(name)) {
+      return sum + entry.value
+    }
+
+    return sum
+  }, 0)
+}
+
+const getTaxFromOrderItems = (order: OrderApiOrder) => {
+  let totalCents = 0
+
+  for (const item of order.items ?? []) {
+    if (item.tax) {
+      totalCents += item.tax
+    }
+  }
+
+  return normalizeMoneyCents(totalCents)
+}
+
+const getShippingFromLogisticsInfo = (order: OrderApiOrder) => {
+  let totalCents = 0
+
+  for (const info of order.shippingData?.logisticsInfo ?? []) {
+    const directPrice = (info as { price?: number }).price
+
+    if (directPrice) {
+      totalCents += directPrice
+      continue
+    }
+
+    const selectedId = info.selectedSlaId || info.selectedSla
+    const sla = info.slas?.find(
+      (entry) => entry.id === selectedId || entry.name === selectedId
+    )
+    const slaPrice = (sla as { price?: number })?.price
+
+    if (slaPrice) {
+      totalCents += slaPrice
+    }
+  }
+
+  return normalizeMoneyCents(totalCents)
+}
+
+export type PixelPurchaseTotals = {
+  transactionTotal?: number
+  transactionTax?: number
+  transactionShipping?: number
+  productTaxCents?: number
+}
+
+export type PurchaseEcommerceTotals = {
+  value: number
+  tax: number
+  shipping: number
+}
+
+export const getPurchaseEcommerceTotals = (
+  order: OrderApiOrder | LoadedOrderPlacedOrder,
+  itemsSubtotal: number,
+  pixelTotals?: PixelPurchaseTotals
+): PurchaseEcommerceTotals => {
+  let tax = normalizeMoneyCents(
+    findTotalizerCents(order.totalizers, TOTALIZER_TAX_IDS) ||
+      findTotalizerCentsByTaxPattern(order.totalizers)
+  )
+  let shipping = normalizeMoneyCents(
+    findTotalizerCents(order.totalizers, TOTALIZER_SHIPPING_IDS)
+  )
+  let value = normalizeMoneyCents(order.value)
+
+  if (!tax) {
+    tax = getTaxFromOrderItems(order)
+  }
+
+  if (pixelTotals?.productTaxCents) {
+    tax = normalizeMoneyCents(pixelTotals.productTaxCents)
+  }
+
+  if (pixelTotals?.transactionTax != null && pixelTotals.transactionTax > 0) {
+    tax = roundMoney(pixelTotals.transactionTax)
+  }
+
+  if (pixelTotals?.transactionShipping != null) {
+    shipping = roundMoney(pixelTotals.transactionShipping)
+  }
+
+  if (pixelTotals?.transactionTotal != null) {
+    value = roundMoney(pixelTotals.transactionTotal)
+  }
+
+  if (!shipping) {
+    shipping = getShippingFromLogisticsInfo(order)
+  }
+
+  if (!value) {
+    value = roundMoney(itemsSubtotal + shipping + tax)
+  } else if (!shipping && value > itemsSubtotal) {
+    shipping = roundMoney(Math.max(0, value - itemsSubtotal - tax))
+  }
+
+  if (!tax && value > itemsSubtotal + shipping) {
+    tax = roundMoney(value - itemsSubtotal - shipping)
+  }
+
+  if (!tax) {
+    tax = extractInclusiveTaxFromGross(
+      roundMoney(itemsSubtotal + shipping),
+      getOrderCurrency(order)
+    )
+  }
+
+  return { value, tax, shipping }
 }
 
 const getTotalizerValue = (order: OrderApiOrder, id: string) => {
