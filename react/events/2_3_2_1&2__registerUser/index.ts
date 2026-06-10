@@ -2,13 +2,13 @@ import { canUseDOM } from 'vtex.render-runtime'
 
 import { withHashedUserPii } from '../../hashPii'
 import {
-    NOT_AVAILABLE,
     clearAwaitingRegisterUserProperties,
     hasAwaitingRegisterUserProperties,
     pushToDataLayer,
     setAwaitingRegisterUserProperties,
 } from '../../utils'
 import type { UserData } from '../../typings/events'
+import { waitForMagentaUserProperties } from '../magentaProfile'
 
 const CREATE_ACCOUNT_ROOT_SELECTOR = '[class*="content--createAccount"]'
 const REGISTER_SUCCESS_ROOT_SELECTOR = '[class*="content--welcomeToAruma"]'
@@ -162,20 +162,22 @@ const pushRegisterSuccessEvents = () => {
 }
 
 const pushRegisterUserProperties = (data: UserData) => {
-    void (async () => {
-        const hashed = await withHashedUserPii({
-            userID: data.document || NOT_AVAILABLE,
-            correo: data.email || NOT_AVAILABLE,
-            edadUsuario: NOT_AVAILABLE,
-            magentaUser: NOT_AVAILABLE,
-            magentaPointsUser: NOT_AVAILABLE,
-        })
+    waitForMagentaUserProperties(
+        {
+            document: data.document,
+            email: data.email,
+        },
+        (userProperties) => {
+            void (async () => {
+                const hashed = await withHashedUserPii(userProperties)
 
-        pushToDataLayer({
-            event: 'userProperties',
-            ...hashed,
-        })
-    })()
+                pushToDataLayer({
+                    event: 'userProperties',
+                    ...hashed,
+                })
+            })()
+        }
+    )
 }
 
 const syncRegisterStep1 = () => {
