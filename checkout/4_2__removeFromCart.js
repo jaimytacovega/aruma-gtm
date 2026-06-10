@@ -1,5 +1,5 @@
 /**
- * Checkout cart (#/cart): remove_from_cart when user clicks "-" to decrease quantity.
+ * Checkout cart (#/cart): remove_from_cart on "-" decrement or "Eliminar" remove link.
  * Paste after 3_5__addToCart.js.
  */
 ;((global) => {
@@ -13,6 +13,12 @@
     'a[data-i18n="cart.decreaseQuantity"]',
   ].join(', ')
 
+  const REMOVE_SELECTOR = [
+    'a.item-link-remove',
+    '.item-link-remove',
+    'a[id^="item-remove-"]',
+  ].join(', ')
+
   const CART_ROW_SELECTOR = 'tr.product-item, tr.item'
 
   const matchesDecrementButton = (element) => {
@@ -23,19 +29,45 @@
     return element.matches(DECREMENT_SELECTOR)
   }
 
-  const findDecrementButton = (event) => {
-    if (typeof event.composedPath === 'function') {
-      const fromPath = event
-        .composedPath()
-        .find((node) => matchesDecrementButton(node))
+  const matchesRemoveLink = (element) => {
+    if (!(element instanceof Element)) {
+      return false
+    }
 
-      if (fromPath) {
-        return fromPath
+    return element.matches(REMOVE_SELECTOR)
+  }
+
+  const findCartActionTarget = (event) => {
+    if (typeof event.composedPath === 'function') {
+      const fromPath = event.composedPath().find((node) => {
+        if (!(node instanceof Element)) {
+          return false
+        }
+
+        return matchesRemoveLink(node) || matchesDecrementButton(node)
+      })
+
+      if (fromPath instanceof Element) {
+        if (matchesRemoveLink(fromPath)) {
+          return { element: fromPath, mode: 'remove' }
+        }
+
+        return { element: fromPath, mode: 'decrement' }
       }
     }
 
     if (event.target instanceof Element) {
-      return event.target.closest(DECREMENT_SELECTOR)
+      const removeLink = event.target.closest(REMOVE_SELECTOR)
+
+      if (removeLink) {
+        return { element: removeLink, mode: 'remove' }
+      }
+
+      const decrementButton = event.target.closest(DECREMENT_SELECTOR)
+
+      if (decrementButton) {
+        return { element: decrementButton, mode: 'decrement' }
+      }
     }
 
     return null
@@ -142,6 +174,9 @@
       }
     }
 
+    const removedQtyForMissingItem = (before, mode) =>
+      mode === 'remove' ? before : 1
+
     const findDecreasedItem = (snapshot, orderForm, hint, orderItem) => {
       const items = orderForm.items || []
 
@@ -155,7 +190,10 @@
           }
 
           if (!item && before > 0 && orderItem) {
-            return { item: orderItem, removedQty: 1 }
+            return {
+              item: orderItem,
+              removedQty: removedQtyForMissingItem(before, hint.mode),
+            }
           }
         }
       }
@@ -170,7 +208,10 @@
           }
 
           if (!item && before > 0) {
-            return { item: orderItem, removedQty: 1 }
+            return {
+              item: orderItem,
+              removedQty: removedQtyForMissingItem(before, hint.mode),
+            }
           }
         }
       }
@@ -196,7 +237,10 @@
         const stillThere = items.some((line) => String(line.id) === hint.sku)
 
         if (before !== undefined && before > 0 && !stillThere) {
-          return { item: orderItem, removedQty: 1 }
+          return {
+            item: orderItem,
+            removedQty: removedQtyForMissingItem(before, hint.mode),
+          }
         }
       }
 
@@ -211,6 +255,7 @@
       const hint = {
         sku: pending.sku,
         rowIndex: pending.rowIndex,
+        mode: pending.mode,
       }
       const result = findDecreasedItem(
         pending.snapshot,
@@ -241,18 +286,18 @@
       }
     }
 
-    const onDecrementClick = (event) => {
+    const onCartRemoveClick = (event) => {
       if (!isCheckoutCartPage()) {
         return
       }
 
-      const button = findDecrementButton(event)
+      const action = findCartActionTarget(event)
 
-      if (!button) {
+      if (!action) {
         return
       }
 
-      const row = findCartRow(button)
+      const row = findCartRow(action.element)
       const sku = getSkuFromRow(row)
       const rowIndex = row ? getRowIndex(row) : -1
       const checkout = global.vtexjs?.checkout
@@ -269,6 +314,7 @@
           orderItem: getOrderItemFromForm(orderForm, sku, rowIndex),
           sku,
           rowIndex,
+          mode: action.mode,
           timeoutId: global.setTimeout(clearPending, PENDING_TIMEOUT_MS),
         }
       })
@@ -283,7 +329,7 @@
     }
 
     const attach = () => {
-      global.document.addEventListener('click', onDecrementClick, true)
+      global.document.addEventListener('click', onCartRemoveClick, true)
 
       if (global.jQuery) {
         global.jQuery(global).on('orderFormUpdated.vtex', onOrderFormUpdated)
