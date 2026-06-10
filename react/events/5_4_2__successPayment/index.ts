@@ -177,13 +177,23 @@ const runPurchaseFromPixelOrder = async (data: OrderPlacedData) => {
     return
   }
 
-  const payment_type =
-    data.transactionPaymentType?.[0]?.paymentSystemName ||
-    data.transactionPaymentType?.[0]?.group ||
-    NOT_AVAILABLE
+  const payment_type = getPaymentType({
+    paymentData: {
+      payments: (data.transactionPaymentType ?? []).map((payment) => ({
+        paymentSystemName: payment.paymentSystemName,
+        groupName: payment.group,
+        group: payment.group,
+      })),
+    },
+  })
 
-  const shipping_tier =
-    data.transactionShippingMethod?.[0]?.selectedSla || NOT_AVAILABLE
+  const shipping_tier = getShippingTier({
+    shippingData: {
+      logisticsInfo: (data.transactionShippingMethod ?? []).map((method) => ({
+        selectedSla: method.selectedSla,
+      })),
+    },
+  })
 
   await pushPurchasePayload(
     orderGroup,

@@ -1,3 +1,4 @@
+import { getListContextFromPurchaseContext } from './orderPlaced/orderPlacedUtils'
 import { saveListContextForProduct } from '../listContextStore'
 import { getListFromLastSelectItem, log, NOT_AVAILABLE } from '../utils'
 import type { AddToCartData } from '../typings/events'
@@ -80,6 +81,15 @@ const resolveListContextForCartItem = async (
   cartItem: VtexCartItem
 ): Promise<{ listId: string; listName: string }> => {
   const slug = getSlugFromCartItem(cartItem)
+  const fromPurchaseContext = getListContextFromPurchaseContext(
+    cartItem.productId,
+    slug
+  )
+
+  if (fromPurchaseContext) {
+    return fromPurchaseContext
+  }
+
   const fromHistory = getListFromLastSelectItem(slug, cartItem.productId)
 
   if (fromHistory.listId !== NOT_AVAILABLE) {

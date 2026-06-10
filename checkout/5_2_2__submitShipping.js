@@ -75,8 +75,24 @@
     }
 
     const getShippingTierFromDom = () => {
+      if (
+        document.querySelector(
+          '#shipping-option-pickup-in-point.shp-method-option-active, #shipping-option-pickup-in-point.vtex-omnishipping-1-x-deliveryOptionActive'
+        )
+      ) {
+        return 'pickup-in-point'
+      }
+
+      if (
+        document.querySelector(
+          '#shipping-option-delivery.shp-method-option-active, #shipping-option-delivery.vtex-omnishipping-1-x-deliveryOptionActive'
+        )
+      ) {
+        return 'delivery'
+      }
+
       const activeOption = document.querySelector(
-        '#shipping-option-delivery.shp-method-option-active, #shipping-option-delivery.vtex-omnishipping-1-x-deliveryOptionActive, #shipping-option-pickup-in-point.shp-method-option-active, #shipping-option-pickup-in-point.vtex-omnishipping-1-x-deliveryOptionActive, .shp-method-option-active, .vtex-omnishipping-1-x-deliveryOptionActive'
+        '.shp-method-option-active, .vtex-omnishipping-1-x-deliveryOptionActive'
       )
 
       if (!activeOption) {
@@ -115,11 +131,19 @@
       return ''
     }
 
-    const resolveShippingTier = (orderForm) =>
-      capturedShippingTier ||
-      getShippingTierFromDom() ||
-      getShippingTierFromOrderForm(orderForm) ||
-      NOT_AVAILABLE
+    const resolveShippingTier = (orderForm) => {
+      const raw =
+        capturedShippingTier ||
+        getShippingTierFromDom() ||
+        getShippingTierFromOrderForm(orderForm) ||
+        ''
+
+      if (typeof orderFormUtils.normalizeShippingTier === 'function') {
+        return orderFormUtils.normalizeShippingTier(raw || NOT_AVAILABLE)
+      }
+
+      return raw || NOT_AVAILABLE
+    }
 
     const buildAddShippingInfoPayload = (
       items,
@@ -163,6 +187,13 @@
       pushToDataLayer(
         buildAddShippingInfoPayload(items, currency, coupon, shipping_tier)
       )
+
+      if (
+        typeof orderFormUtils.persistCheckoutPurchaseContext === 'function' &&
+        shipping_tier !== NOT_AVAILABLE
+      ) {
+        orderFormUtils.persistCheckoutPurchaseContext({ shipping_tier })
+      }
     }
 
     const completeShippingSubmit = async (orderForm) => {

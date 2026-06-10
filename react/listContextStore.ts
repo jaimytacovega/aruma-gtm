@@ -11,6 +11,10 @@ const PERSIST_EVENTS = new Set([
     'view_item_list',
     'add_to_cart',
     'view_item',
+    'add_payment_info',
+    'add_shipping_info',
+    'begin_checkout',
+    'view_cart',
 ])
 
 export type ProductListContext = {

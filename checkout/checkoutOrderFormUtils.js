@@ -62,13 +62,180 @@
         return ''
       }
 
-      return (
-        normalizeText(activePayment.getAttribute('data-name')) ||
-        normalizeText(activePayment.textContent)
+      const paymentId = activePayment.id || ''
+      const label = normalizeText(
+        activePayment.querySelector('.payment-group-item-text')?.textContent ||
+          activePayment.textContent
+      )
+
+      if (paymentId.includes('Yape') || /yape/i.test(label)) {
+        return PAYMENT_TYPE_YAPE
+      }
+
+      if (paymentId.includes('MercadoPagoOff') || /efectivo/i.test(label)) {
+        return PAYMENT_TYPE_CASH
+      }
+
+      if (
+        paymentId.includes('creditCard') ||
+        /tarjeta|cr[eé]dito|debito|d[eé]bito/i.test(label)
+      ) {
+        return PAYMENT_TYPE_CARD
+      }
+
+      return normalizePaymentType(
+        label || activePayment.getAttribute('data-name') || ''
       )
     }
 
-    const getPaymentType = (orderForm) => {
+    const PAYMENT_TYPE_YAPE = 'Yape'
+    const PAYMENT_TYPE_CASH = 'Pago efectivo'
+    const PAYMENT_TYPE_CARD = 'Tarjeta de credito y debito'
+    const SHIPPING_TIER_HOME = 'Despacho a Domicilio'
+    const SHIPPING_TIER_PICKUP = 'Retirar en Tienda'
+
+    const normalizePaymentType = (value) => {
+      if (!isUsableContextValue(value)) {
+        return NOT_AVAILABLE
+      }
+
+      const lower = String(value).toLowerCase()
+
+      if (lower.includes('yape')) {
+        return PAYMENT_TYPE_YAPE
+      }
+
+      if (
+        lower.includes('efectivo') ||
+        lower.includes('mercadopagooff') ||
+        lower.includes('cash')
+      ) {
+        return PAYMENT_TYPE_CASH
+      }
+
+      if (
+        lower.includes('creditcard') ||
+        lower.includes('tarjeta') ||
+        lower.includes('credit') ||
+        lower.includes('debit') ||
+        lower.includes('visa') ||
+        lower.includes('mastercard') ||
+        lower.includes('amex') ||
+        lower.includes('american express') ||
+        lower.includes('diners') ||
+        /^\d+$/.test(lower.trim())
+      ) {
+        return PAYMENT_TYPE_CARD
+      }
+
+      return NOT_AVAILABLE
+    }
+
+    const normalizeShippingTier = (value) => {
+      if (!isUsableContextValue(value)) {
+        return NOT_AVAILABLE
+      }
+
+      const lower = String(value).toLowerCase()
+
+      if (
+        lower.includes('pickup') ||
+        lower.includes('recoger') ||
+        lower.includes('retirar') ||
+        lower.includes('pick-up') ||
+        (lower.includes('tienda') && !lower.includes('domicilio'))
+      ) {
+        return SHIPPING_TIER_PICKUP
+      }
+
+      if (
+        lower.includes('delivery') ||
+        lower.includes('domicilio') ||
+        lower.includes('despacho') ||
+        lower.includes('enviar') ||
+        lower.includes('direccion') ||
+        lower.includes('dirección')
+      ) {
+        return SHIPPING_TIER_HOME
+      }
+
+      return NOT_AVAILABLE
+    }
+
+    const getShippingTierFromDom = () => {
+      if (
+        document.querySelector(
+          '#shipping-option-pickup-in-point.shp-method-option-active, #shipping-option-pickup-in-point.vtex-omnishipping-1-x-deliveryOptionActive'
+        )
+      ) {
+        return SHIPPING_TIER_PICKUP
+      }
+
+      if (
+        document.querySelector(
+          '#shipping-option-delivery.shp-method-option-active, #shipping-option-delivery.vtex-omnishipping-1-x-deliveryOptionActive'
+        )
+      ) {
+        return SHIPPING_TIER_HOME
+      }
+
+      return ''
+    }
+
+    const CHECKOUT_PURCHASE_CONTEXT_KEY = 'aruma-gtm:checkout-purchase-context'
+
+    const isUsableContextValue = (value) =>
+      Boolean(value && String(value).trim() && value !== NOT_AVAILABLE)
+
+    const persistCheckoutPurchaseContext = (partial) => {
+      try {
+        const raw = global.sessionStorage.getItem(CHECKOUT_PURCHASE_CONTEXT_KEY)
+        const current = raw ? JSON.parse(raw) : {}
+
+        global.sessionStorage.setItem(
+          CHECKOUT_PURCHASE_CONTEXT_KEY,
+          JSON.stringify({
+            ...current,
+            ...partial,
+            updatedAt: Date.now(),
+          })
+        )
+      } catch {
+        // sessionStorage unavailable
+      }
+    }
+
+    const readCheckoutPurchaseContext = () => {
+      try {
+        const raw = global.sessionStorage.getItem(CHECKOUT_PURCHASE_CONTEXT_KEY)
+
+        return raw ? JSON.parse(raw) : {}
+      } catch {
+        return {}
+      }
+    }
+
+    const readLastArumaGtmEcommerceString = (eventName, field) => {
+      const dataLayer = global.dataLayer || []
+
+      for (let index = dataLayer.length - 1; index >= 0; index -= 1) {
+        const entry = dataLayer[index]
+
+        if (entry?.arumaGtm !== true || entry.event !== eventName) {
+          continue
+        }
+
+        const value = entry.ecommerce?.[field]
+
+        if (typeof value === 'string' && isUsableContextValue(value)) {
+          return normalizeText(value)
+        }
+      }
+
+      return ''
+    }
+
+    const resolvePaymentTypeFromOrderForm = (orderForm) => {
       const payment = orderForm?.paymentData?.payments?.[0]
 
       if (payment?.paymentSystemName) {
@@ -79,14 +246,44 @@
         return normalizeText(payment.groupName)
       }
 
+      if (payment?.group) {
+        return normalizeText(payment.group)
+      }
+
       if (payment?.paymentSystem) {
         return String(payment.paymentSystem)
       }
 
-      return getPaymentTypeFromDom() || NOT_AVAILABLE
+      for (const transaction of orderForm?.paymentData?.transactions ?? []) {
+        for (const txPayment of transaction.payments ?? []) {
+          if (txPayment.paymentSystemName) {
+            return normalizeText(txPayment.paymentSystemName)
+          }
+
+          if (txPayment.groupName) {
+            return normalizeText(txPayment.groupName)
+          }
+
+          if (txPayment.group) {
+            return normalizeText(txPayment.group)
+          }
+
+          if (txPayment.paymentSystem) {
+            return String(txPayment.paymentSystem)
+          }
+        }
+      }
+
+      const paymentName = orderForm?.paymentNames?.[0]
+
+      if (paymentName) {
+        return normalizeText(paymentName)
+      }
+
+      return ''
     }
 
-    const getShippingTier = (orderForm) => {
+    const resolveShippingTierFromOrderForm = (orderForm) => {
       const logisticsInfo = orderForm?.shippingData?.logisticsInfo ?? []
 
       for (const logistics of logisticsInfo) {
@@ -98,6 +295,10 @@
           return normalizeText(selectedSla.name)
         }
 
+        if (isUsableContextValue(logistics.selectedSla)) {
+          return normalizeText(logistics.selectedSla)
+        }
+
         if (selectedSla?.deliveryChannel === 'pickup-in-point') {
           return 'Recoger en la tienda'
         }
@@ -105,9 +306,43 @@
         if (selectedSla?.deliveryChannel === 'delivery') {
           return 'Enviar a la dirección'
         }
+
+        if (logistics.selectedDeliveryChannel === 'pickup-in-point') {
+          return 'Recoger en la tienda'
+        }
+
+        if (logistics.selectedDeliveryChannel === 'delivery') {
+          return 'Enviar a la dirección'
+        }
       }
 
-      return NOT_AVAILABLE
+      return ''
+    }
+
+    const getPaymentType = (orderForm) => {
+      const raw =
+        resolvePaymentTypeFromOrderForm(orderForm) ||
+        getPaymentTypeFromDom() ||
+        readCheckoutPurchaseContext().payment_type ||
+        readLastArumaGtmEcommerceString('add_payment_info', 'payment_type') ||
+        ''
+
+      const normalized = normalizePaymentType(raw)
+
+      return normalized !== NOT_AVAILABLE ? normalized : NOT_AVAILABLE
+    }
+
+    const getShippingTier = (orderForm) => {
+      const raw =
+        resolveShippingTierFromOrderForm(orderForm) ||
+        getShippingTierFromDom() ||
+        readCheckoutPurchaseContext().shipping_tier ||
+        readLastArumaGtmEcommerceString('add_shipping_info', 'shipping_tier') ||
+        ''
+
+      const normalized = normalizeShippingTier(raw)
+
+      return normalized !== NOT_AVAILABLE ? normalized : NOT_AVAILABLE
     }
 
     const getTransactionId = (orderForm) => {
@@ -180,8 +415,17 @@
         orderGroup: primary.orderGroup || getOrderGroupFromUrl(),
         value: orders.reduce((sum, order) => sum + (order.value || 0), 0),
         totalizers: primary.totalizers ?? [],
-        paymentData: primary.paymentData ?? null,
-        shippingData: primary.shippingData ?? null,
+        paymentData:
+          orders.find((order) => order.paymentData)?.paymentData ??
+          primary.paymentData ??
+          null,
+        shippingData:
+          orders.find((order) => order.shippingData)?.shippingData ??
+          primary.shippingData ??
+          null,
+        paymentNames:
+          primary.paymentNames ??
+          orders.find((order) => order.paymentNames?.length)?.paymentNames,
         marketingData: primary.marketingData ?? null,
         storePreferencesData: primary.storePreferencesData ?? null,
       }
@@ -397,6 +641,10 @@
       getOrderValue,
       getPaymentType,
       getShippingTier,
+      getShippingTierFromDom,
+      normalizePaymentType,
+      normalizeShippingTier,
+      persistCheckoutPurchaseContext,
       getTransactionId,
       hasFiredOrderPlacedEvent,
       markOrderPlacedEventFired,

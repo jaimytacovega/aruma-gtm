@@ -111,6 +111,17 @@
         buildAddPaymentInfoPayload(items, currency, coupon, payment_type, totals)
       )
 
+      if (typeof orderFormUtils.persistCheckoutPurchaseContext === 'function') {
+        orderFormUtils.persistCheckoutPurchaseContext({
+          payment_type,
+          items: items.map((item) => ({
+            item_id: String(item.item_id ?? ''),
+            item_list_id: String(item.item_list_id ?? ''),
+            item_list_name: String(item.item_list_name ?? ''),
+          })),
+        })
+      }
+
       setAwaitingOrderPlaced()
     }
 
