@@ -1,6 +1,6 @@
 /**
- * Checkout flow: begin_checkout on #/profile, #/email, and fallbacks on #/shipping / #/payment.
- * Paste after checkoutCartItems.js.
+ * Checkout flow: begin_checkout only when the previous navigation was #/cart.
+ * Regular path: cart → profile/email. Skipped steps: cart → shipping, cart → payment.
  */
 ;((global) => {
   const isCheckoutIdentificationPage = () => {
@@ -21,7 +21,7 @@
     global.location.pathname.includes('/checkout') &&
     global.location.hash.includes('/payment')
 
-  const isCheckoutBeginCheckoutPage = () =>
+  const isCheckoutFlowPage = () =>
     isCheckoutIdentificationPage() ||
     isCheckoutShippingPage() ||
     isCheckoutPaymentPage()
@@ -32,7 +32,20 @@
     orderFormUtils,
     NOT_AVAILABLE,
   }) => {
-    let identificationBeginCheckoutFiredForHash = ''
+    const log = (...args) => {
+      console.info('[aruma-gtm]', 'checkout-flow', 'begin_checkout', ...args)
+    }
+
+    const beginCheckoutFiredHashes = new Set()
+
+    const claimBeginCheckoutForHash = (hash) => {
+      if (beginCheckoutFiredHashes.has(hash)) {
+        return false
+      }
+
+      beginCheckoutFiredHashes.add(hash)
+      return true
+    }
 
     const buildBeginCheckoutPayload = (items, currency, coupon) => {
       const value = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -53,31 +66,7 @@
       }
     }
 
-    const shouldFireBeginCheckout = () => {
-      if (isCheckoutIdentificationPage()) {
-        return identificationBeginCheckoutFiredForHash !== global.location.hash
-      }
-
-      if (isCheckoutShippingPage() || isCheckoutPaymentPage()) {
-        return !orderFormUtils.hasArumaGtmEventInDataLayer('begin_checkout')
-      }
-
-      return false
-    }
-
-    const runStartCheckout = async (orderForm) => {
-      if (!isCheckoutBeginCheckoutPage() || !shouldFireBeginCheckout()) {
-        return
-      }
-
-      if (!orderForm?.items?.length) {
-        return
-      }
-
-      if (isCheckoutIdentificationPage()) {
-        identificationBeginCheckoutFiredForHash = global.location.hash
-      }
-
+    const pushBeginCheckout = async (orderForm, reason) => {
       const currency = orderFormUtils.getCurrency(orderForm)
       const coupon = orderFormUtils.getCoupon(orderForm)
 
@@ -86,43 +75,90 @@
         orderFormUtils
       )
 
+      log('firing', reason, global.location.hash)
       pushToDataLayer(buildBeginCheckoutPayload(items, currency, coupon))
     }
 
-    const requestOrderForm = () => {
+    const getFlowStep = () => {
+      if (isCheckoutIdentificationPage()) {
+        return 'identification'
+      }
+
+      if (isCheckoutShippingPage()) {
+        return 'shipping'
+      }
+
+      if (isCheckoutPaymentPage()) {
+        return 'payment'
+      }
+
+      return ''
+    }
+
+    const runStartCheckout = async (orderForm, source) => {
+      if (!orderForm?.items?.length) {
+        log('skip: no items', source, global.location.hash)
+        return
+      }
+
+      if (!isCheckoutFlowPage()) {
+        return
+      }
+
+      if (!orderFormUtils.cameFromCheckoutCart()) {
+        log('skip: not from cart', source, {
+          hash: global.location.hash,
+          step: getFlowStep(),
+          previous: orderFormUtils.getPreviousCheckoutNavigation(),
+        })
+        return
+      }
+
+      const hash = global.location.hash
+
+      if (!claimBeginCheckoutForHash(hash)) {
+        log('skip: already fired for hash', source, hash)
+        return
+      }
+
+      const reason = `${getFlowStep()}-from-cart:${source}`
+      const fire = () => pushBeginCheckout(orderForm, reason)
+
+      if (isCheckoutPaymentPage()) {
+        await orderFormUtils.chainCheckoutFlowStep('begin_checkout', fire)
+        return
+      }
+
+      await fire()
+    }
+
+    const requestOrderForm = (source) => {
       if (!global.vtexjs?.checkout?.getOrderForm) {
+        log('skip: vtexjs.checkout.getOrderForm unavailable', source)
         return
       }
 
       global.vtexjs.checkout.getOrderForm().done((orderForm) => {
-        void runStartCheckout(orderForm)
+        void runStartCheckout(orderForm, source)
       })
     }
 
     const onHashChange = () => {
       if (!global.location.pathname.includes('/checkout')) {
-        identificationBeginCheckoutFiredForHash = ''
         return
       }
 
-      if (!isCheckoutIdentificationPage()) {
-        identificationBeginCheckoutFiredForHash = ''
-      }
-
-      if (isCheckoutBeginCheckoutPage()) {
-        requestOrderForm()
+      if (isCheckoutFlowPage()) {
+        requestOrderForm('hashchange')
       }
     }
 
     const attach = () => {
-      if (global.jQuery) {
-        global.jQuery(global).on('orderFormUpdated.vtex', (_, orderForm) => {
-          void runStartCheckout(orderForm)
-        })
+      if (isCheckoutFlowPage()) {
+        requestOrderForm('attach')
       }
 
-      requestOrderForm()
-      global.addEventListener('hashchange', onHashChange)
+      global.addEventListener('hashchange', onHashChange, true)
     }
 
     return attach

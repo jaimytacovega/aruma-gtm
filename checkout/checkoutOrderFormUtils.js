@@ -796,8 +796,184 @@
       )
     }
 
+    const CHECKOUT_FLOW_NAVIGATIONS_KEY = 'aruma-gtm:checkout-flow-navigations'
+    const MAX_CHECKOUT_FLOW_NAVIGATIONS = 50
+
+    let checkoutFlowStepChain = Promise.resolve()
+
+    const readCheckoutFlowNavigations = () => {
+      try {
+        const raw = global.sessionStorage.getItem(CHECKOUT_FLOW_NAVIGATIONS_KEY)
+
+        if (raw) {
+          const parsed = JSON.parse(raw)
+
+          return Array.isArray(parsed) ? parsed : []
+        }
+      } catch {
+        // sessionStorage unavailable or corrupt
+      }
+
+      return []
+    }
+
+    const persistCheckoutFlowNavigation = (entry) => {
+      try {
+        const navigations = readCheckoutFlowNavigations()
+
+        navigations.push(entry)
+
+        if (navigations.length > MAX_CHECKOUT_FLOW_NAVIGATIONS) {
+          navigations.splice(
+            0,
+            navigations.length - MAX_CHECKOUT_FLOW_NAVIGATIONS
+          )
+        }
+
+        global.sessionStorage.setItem(
+          CHECKOUT_FLOW_NAVIGATIONS_KEY,
+          JSON.stringify(navigations)
+        )
+      } catch {
+        // sessionStorage unavailable
+      }
+    }
+
+    const normalizeCheckoutHash = (hash) => (hash || '').trim().toLowerCase()
+
+    const getLastCheckoutNavigation = () => {
+      const navigations = readCheckoutFlowNavigations()
+
+      return navigations.length ? navigations[navigations.length - 1] : null
+    }
+
+    const isSameCheckoutNavigation = (entry) => {
+      if (!entry) {
+        return false
+      }
+
+      const currentHash = normalizeCheckoutHash(global.location.hash)
+      const entryHash = normalizeCheckoutHash(entry.hash)
+
+      if (currentHash && entryHash && currentHash === entryHash) {
+        return true
+      }
+
+      return Boolean(entry.href && entry.href === global.location.href)
+    }
+
+    const getPreviousCheckoutNavigation = () => {
+      const navigations = readCheckoutFlowNavigations()
+
+      for (let index = navigations.length - 1; index >= 0; index -= 1) {
+        if (!isSameCheckoutNavigation(navigations[index])) {
+          return navigations[index]
+        }
+      }
+
+      return null
+    }
+
+    const isCheckoutCartNavigation = (navigation) => {
+      if (!navigation) {
+        return false
+      }
+
+      const hash = normalizeCheckoutHash(navigation.hash)
+
+      return hash === '#/cart' || hash.endsWith('/cart') || navigation.step === 'cart'
+    }
+
+    const cameFromCheckoutCart = () =>
+      isCheckoutCartNavigation(getPreviousCheckoutNavigation())
+
+    const chainCheckoutFlowStep = (stepName, fn) => {
+      checkoutFlowStepChain = checkoutFlowStepChain
+        .then(() => fn())
+        .catch((error) => {
+          console.info(
+            '[aruma-gtm]',
+            'checkout-flow',
+            'step failed',
+            stepName,
+            error
+          )
+        })
+
+      return checkoutFlowStepChain
+    }
+
+    const getCheckoutNavigationStep = () => {
+      const { pathname, hash } = global.location
+
+      if (!pathname.includes('/checkout')) {
+        return null
+      }
+
+      const hashLower = hash.toLowerCase()
+
+      if (hashLower.includes('/profile')) {
+        return 'profile'
+      }
+
+      if (hashLower.includes('/email')) {
+        return 'email'
+      }
+
+      if (hashLower.includes('/shipping')) {
+        return 'shipping'
+      }
+
+      if (hashLower.includes('/payment')) {
+        return 'payment'
+      }
+
+      if (hashLower.includes('/cart')) {
+        return 'cart'
+      }
+
+      if (
+        /\/checkout\/orderplaced/i.test(pathname) ||
+        hashLower.includes('orderplaced') ||
+        hashLower.includes('/confirmation')
+      ) {
+        return 'orderPlaced'
+      }
+
+      return hash || 'checkout'
+    }
+
+    const logCheckoutNavigation = (source = 'navigation') => {
+      const { pathname, hash } = global.location
+
+      if (!pathname.includes('/checkout')) {
+        return
+      }
+
+      const entry = {
+        at: Date.now(),
+        source,
+        pathname,
+        hash,
+        step: getCheckoutNavigationStep(),
+        href: global.location.href,
+        previousNavigation: getPreviousCheckoutNavigation(),
+        cameFromCart: cameFromCheckoutCart(),
+      }
+
+      console.info('[aruma-gtm]', 'checkout-flow', 'navigated', entry)
+      persistCheckoutFlowNavigation(entry)
+    }
+
     return {
       hasArumaGtmEventInDataLayer,
+      getLastCheckoutNavigation,
+      getPreviousCheckoutNavigation,
+      cameFromCheckoutCart,
+      chainCheckoutFlowStep,
+      getCheckoutNavigationStep,
+      logCheckoutNavigation,
+      readCheckoutFlowNavigations,
       isCheckoutPaymentPage,
       isCheckoutOrderPlacedPage,
       getOrderGroupFromUrl,

@@ -1,6 +1,6 @@
 /**
  * Checkout shipping (#/shipping): add_shipping_info after successful submit (#btn-go-to-payment).
- * Paste before checkout-ui-custom.js.
+ * Fallback on #/payment when previous navigation was #/cart (after begin_checkout).
  */
 ;((global) => {
   const SHIPPING_SUBMIT_SELECTOR = '#btn-go-to-payment'
@@ -60,6 +60,21 @@
     normalizeText,
     NOT_AVAILABLE,
   }) => {
+    const log = (...args) => {
+      console.info('[aruma-gtm]', 'checkout-flow', 'add_shipping_info', ...args)
+    }
+
+    const addShippingInfoFiredHashes = new Set()
+
+    const claimAddShippingInfoForHash = (hash) => {
+      if (addShippingInfoFiredHashes.has(hash)) {
+        return false
+      }
+
+      addShippingInfoFiredHashes.add(hash)
+      return true
+    }
+
     let pendingShippingSubmit = false
     let capturedShippingTier = ''
     let pendingTimeoutId = null
@@ -190,8 +205,9 @@
       }
     }
 
-    const pushAddShippingInfo = async (orderForm) => {
+    const pushAddShippingInfo = async (orderForm, reason) => {
       if (!orderForm?.items?.length) {
+        log('skip: no items', reason)
         return
       }
 
@@ -204,6 +220,7 @@
         orderFormUtils
       )
 
+      log('firing', reason, global.location.hash)
       pushToDataLayer(
         buildAddShippingInfoPayload(items, currency, coupon, shipping_tier)
       )
@@ -221,20 +238,33 @@
         return
       }
 
-      await pushAddShippingInfo(orderForm)
+      await pushAddShippingInfo(orderForm, 'shipping-submit')
       clearPending()
     }
 
-    const runAddShippingInfoFallback = async (orderForm) => {
+    const runAddShippingInfoFallback = async (orderForm, source) => {
       if (!isCheckoutPaymentPage()) {
         return
       }
 
-      if (orderFormUtils.hasArumaGtmEventInDataLayer('add_shipping_info')) {
+      if (!orderFormUtils.cameFromCheckoutCart()) {
+        log('skip: payment without cart previous', source, {
+          hash: global.location.hash,
+          previous: orderFormUtils.getPreviousCheckoutNavigation(),
+        })
         return
       }
 
-      await pushAddShippingInfo(orderForm)
+      const hash = global.location.hash
+
+      if (!claimAddShippingInfoForHash(`${hash}:fallback`)) {
+        log('skip: already fired fallback for hash', source, hash)
+        return
+      }
+
+      await orderFormUtils.chainCheckoutFlowStep('add_shipping_info', () =>
+        pushAddShippingInfo(orderForm, `payment-from-cart:${source}`)
+      )
     }
 
     const requestOrderFormAndComplete = () => {
@@ -280,11 +310,15 @@
       }
 
       global.vtexjs.checkout.getOrderForm().done((orderForm) => {
-        void runAddShippingInfoFallback(orderForm)
+        void runAddShippingInfoFallback(orderForm, 'getOrderForm')
       })
     }
 
     const handleHashChange = () => {
+      if (!global.location.pathname.includes('/checkout')) {
+        return
+      }
+
       if (isCheckoutPaymentPage()) {
         if (pendingShippingSubmit) {
           requestOrderFormAndComplete()
@@ -312,15 +346,11 @@
 
         return
       }
-
-      if (isCheckoutPaymentPage()) {
-        void runAddShippingInfoFallback(orderForm)
-      }
     }
 
     const attach = () => {
       document.addEventListener('click', handleShippingSubmitClick, true)
-      global.addEventListener('hashchange', handleHashChange)
+      global.addEventListener('hashchange', handleHashChange, true)
 
       if (global.jQuery) {
         global.jQuery(global).on('orderFormUpdated.vtex', handleOrderFormUpdated)

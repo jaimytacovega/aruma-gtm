@@ -372,19 +372,22 @@
     syncOrderPlacedEvents()
     // Capture phase runs before Knockout's click: cart.next handler.
     document.addEventListener('click', handleCartButtonsClick, true)
+    orderFormUtils.logCheckoutNavigation('attach')
+  }
+
+  const onCheckoutHashChange = () => {
+    lastWatchedHref = window.location.href
+    syncOrderPlacedEvents()
+    lastAnalyticsUrl = ''
+    pushAnalyticsLoaded()
+    orderFormUtils.logCheckoutNavigation('hashchange')
   }
 
   orderFormUtils.setupOrderPlacedTransitionWatcher()
   window.setInterval(watchCheckoutHref, 200)
   window.addEventListener('popstate', syncOrderPlacedEvents)
   window.addEventListener('pageshow', syncOrderPlacedEvents)
-
-  window.addEventListener('hashchange', () => {
-    lastWatchedHref = window.location.href
-    syncOrderPlacedEvents()
-    lastAnalyticsUrl = ''
-    pushAnalyticsLoaded()
-  })
+  window.addEventListener('hashchange', onCheckoutHashChange)
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init)
