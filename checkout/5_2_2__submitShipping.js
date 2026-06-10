@@ -119,12 +119,24 @@
           return normalizeText(selectedSla.name)
         }
 
+        if (logistics?.selectedSla) {
+          return normalizeText(logistics.selectedSla)
+        }
+
         if (selectedSla?.deliveryChannel === 'pickup-in-point') {
-          return 'Recoger en la tienda'
+          return 'pickup-in-point'
         }
 
         if (selectedSla?.deliveryChannel === 'delivery') {
-          return 'Enviar a la dirección'
+          return 'delivery'
+        }
+
+        if (logistics?.selectedDeliveryChannel === 'pickup-in-point') {
+          return 'pickup-in-point'
+        }
+
+        if (logistics?.selectedDeliveryChannel === 'delivery') {
+          return 'delivery'
         }
       }
 
@@ -138,8 +150,16 @@
         getShippingTierFromOrderForm(orderForm) ||
         ''
 
-      if (typeof orderFormUtils.normalizeShippingTier === 'function') {
-        return orderFormUtils.normalizeShippingTier(raw || NOT_AVAILABLE)
+      if (raw && typeof orderFormUtils.normalizeShippingTier === 'function') {
+        const normalized = orderFormUtils.normalizeShippingTier(raw)
+
+        if (normalized !== NOT_AVAILABLE) {
+          return normalized
+        }
+      }
+
+      if (typeof orderFormUtils.getShippingTier === 'function') {
+        return orderFormUtils.getShippingTier(orderForm)
       }
 
       return raw || NOT_AVAILABLE
@@ -201,8 +221,8 @@
         return
       }
 
-      clearPending()
       await pushAddShippingInfo(orderForm)
+      clearPending()
     }
 
     const runAddShippingInfoFallback = async (orderForm) => {
