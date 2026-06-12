@@ -19,7 +19,7 @@ const REGISTER_STEP1_PAGE_PATH = '/cuenta/paso-1'
 
 const REGISTER_SUCCESS_PAGE_TITLE = 'Aruma - Cuenta - Cuenta exitosa'
 const REGISTER_SUCCESS_PAGE_PATH = '/cuenta/cuenta-exitosa'
-const REGISTER_SUCCESS_TITLE = 'Ya eres parte de Aruma'
+const REGISTER_SUCCESS_TITLE_MARKER = 'Ya eres parte'
 const REGISTER_DISCOVER_MORE_CTA = '¡Descubre más!'
 
 let registerFlowObserverAttached = false
@@ -74,11 +74,11 @@ const isRegisterSuccessVisible = (): HTMLElement | null => {
         welcome?.querySelector('[class*="formTitle"]')?.textContent
     )
 
-    if (!titleText.includes(REGISTER_SUCCESS_TITLE)) {
+    if (!titleText.includes(REGISTER_SUCCESS_TITLE_MARKER)) {
         return null
     }
 
-    return isVisibleElement(root)
+    return isVisibleElement(welcome instanceof HTMLElement ? welcome : root)
 }
 
 const isRegisterDiscoverMoreButton = (
