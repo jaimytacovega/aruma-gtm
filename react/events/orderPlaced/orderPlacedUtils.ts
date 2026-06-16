@@ -216,6 +216,7 @@ export const normalizePaymentType = (value: string): string => {
   if (
     lower.includes('efectivo') ||
     lower.includes('mercadopagooff') ||
+    lower.includes('promissory') ||
     lower.includes('cash')
   ) {
     return PAYMENT_TYPE_CASH
@@ -439,6 +440,12 @@ const readLastArumaGtmEcommerceString = (
 }
 
 const resolvePaymentTypeFromOrder = (order: OrderApiOrder): string => {
+  const paymentName = order.paymentNames?.[0]
+
+  if (paymentName) {
+    return normalizeText(paymentName)
+  }
+
   const payment = order.paymentData?.payments?.[0]
 
   if (payment?.paymentSystemName) {
@@ -475,12 +482,6 @@ const resolvePaymentTypeFromOrder = (order: OrderApiOrder): string => {
         return String(txPayment.paymentSystem)
       }
     }
-  }
-
-  const paymentName = order.paymentNames?.[0]
-
-  if (paymentName) {
-    return normalizeText(paymentName)
   }
 
   return ''

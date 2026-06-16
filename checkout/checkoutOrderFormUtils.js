@@ -220,38 +220,69 @@
     const getOrderValue = (orderForm) => (orderForm?.value ?? 0) / 100
 
     const getPaymentTypeFromDom = () => {
-      const activePayment = document.querySelector(
-        '.payment-group-item.active, .payment-group-item.v-custom-payment-item-active, .v-custom-payment-item-active, .payment-group-list-btn.active'
+      const resolvePaymentTypeFromPaymentElement = (activePayment) => {
+        const paymentId = activePayment.id || ''
+        const label = normalizeText(
+          activePayment.querySelector('.payment-group-item-text')?.textContent ||
+            activePayment.textContent
+        )
+
+        if (paymentId.includes('Yape') || /yape/i.test(label)) {
+          return PAYMENT_TYPE_YAPE
+        }
+
+        if (
+          paymentId.includes('MercadoPagoOff') ||
+          paymentId.includes('promissory') ||
+          /efectivo/i.test(label)
+        ) {
+          return PAYMENT_TYPE_CASH
+        }
+
+        if (
+          paymentId.includes('creditCard') ||
+          /tarjeta|cr[eé]dito|debito|d[eé]bito/i.test(label)
+        ) {
+          return PAYMENT_TYPE_CARD
+        }
+
+        return normalizePaymentType(
+          label || activePayment.getAttribute('data-name') || ''
+        )
+      }
+
+      // VTEX marks the user choice with v-custom-payment-item-active; .active can linger on card.
+      const selectedPayment = document.querySelector(
+        '.payment-group-item.v-custom-payment-item-active'
       )
 
-      if (!activePayment) {
-        return ''
+      if (selectedPayment) {
+        const resolved = resolvePaymentTypeFromPaymentElement(selectedPayment)
+
+        if (resolved && resolved !== NOT_AVAILABLE) {
+          return resolved
+        }
       }
 
-      const paymentId = activePayment.id || ''
-      const label = normalizeText(
-        activePayment.querySelector('.payment-group-item-text')?.textContent ||
-          activePayment.textContent
-      )
+      for (const activePayment of document.querySelectorAll(
+        '.payment-group-item.active, .payment-group-list-btn.active'
+      )) {
+        if (!(activePayment instanceof HTMLElement)) {
+          continue
+        }
 
-      if (paymentId.includes('Yape') || /yape/i.test(label)) {
-        return PAYMENT_TYPE_YAPE
+        if (activePayment.classList.contains('v-custom-payment-item-active')) {
+          continue
+        }
+
+        const resolved = resolvePaymentTypeFromPaymentElement(activePayment)
+
+        if (resolved && resolved !== NOT_AVAILABLE) {
+          return resolved
+        }
       }
 
-      if (paymentId.includes('MercadoPagoOff') || /efectivo/i.test(label)) {
-        return PAYMENT_TYPE_CASH
-      }
-
-      if (
-        paymentId.includes('creditCard') ||
-        /tarjeta|cr[eé]dito|debito|d[eé]bito/i.test(label)
-      ) {
-        return PAYMENT_TYPE_CARD
-      }
-
-      return normalizePaymentType(
-        label || activePayment.getAttribute('data-name') || ''
-      )
+      return ''
     }
 
     const PAYMENT_TYPE_YAPE = 'Yape'
@@ -274,6 +305,7 @@
       if (
         lower.includes('efectivo') ||
         lower.includes('mercadopagooff') ||
+        lower.includes('promissory') ||
         lower.includes('cash')
       ) {
         return PAYMENT_TYPE_CASH
@@ -402,6 +434,12 @@
     }
 
     const resolvePaymentTypeFromOrderForm = (orderForm) => {
+      const paymentName = orderForm?.paymentNames?.[0]
+
+      if (paymentName) {
+        return normalizeText(paymentName)
+      }
+
       const payment = orderForm?.paymentData?.payments?.[0]
 
       if (payment?.paymentSystemName) {
@@ -438,12 +476,6 @@
             return String(txPayment.paymentSystem)
           }
         }
-      }
-
-      const paymentName = orderForm?.paymentNames?.[0]
-
-      if (paymentName) {
-        return normalizeText(paymentName)
       }
 
       return ''
@@ -486,12 +518,20 @@
     }
 
     const getPaymentType = (orderForm) => {
-      const raw =
-        resolvePaymentTypeFromOrderForm(orderForm) ||
-        getPaymentTypeFromDom() ||
-        readCheckoutPurchaseContext().payment_type ||
-        readLastArumaGtmEcommerceString('add_payment_info', 'payment_type') ||
-        ''
+      const fromDom = getPaymentTypeFromDom()
+      const fromOrderForm = resolvePaymentTypeFromOrderForm(orderForm)
+
+      const raw = isCheckoutPaymentPage()
+        ? fromDom ||
+          fromOrderForm ||
+          readCheckoutPurchaseContext().payment_type ||
+          readLastArumaGtmEcommerceString('add_payment_info', 'payment_type') ||
+          ''
+        : fromOrderForm ||
+          fromDom ||
+          readCheckoutPurchaseContext().payment_type ||
+          readLastArumaGtmEcommerceString('add_payment_info', 'payment_type') ||
+          ''
 
       const normalized = normalizePaymentType(raw)
 
