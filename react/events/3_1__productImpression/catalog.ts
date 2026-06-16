@@ -105,7 +105,7 @@ export type RemoveFromCartPayload = {
 }
 
 export type AddToWishlistPayload = {
-  event: 'add_to_whislist'
+  event: 'add_to_wishlist'
   ecommerce: {
     currency: string
     value: number
@@ -504,6 +504,6 @@ export const buildAddToWishlistPayload = (
   items: ViewItem[],
   currency: string
 ): AddToWishlistPayload => ({
-  event: 'add_to_whislist',
+  event: 'add_to_wishlist',
   ecommerce: buildCartEcommerce(items, currency),
 })
