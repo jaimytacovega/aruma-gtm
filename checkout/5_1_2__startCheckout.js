@@ -47,19 +47,15 @@
       return true
     }
 
-    const buildBeginCheckoutPayload = (items, currency, coupon) => {
-      const value = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-      const magentaPoints_value = items.reduce(
-        (sum, item) => sum + item.magentaPoints_price * item.quantity,
-        0
-      )
+    const buildBeginCheckoutPayload = (items, currency, coupon, orderForm) => {
+      const totals = orderFormUtils.buildCheckoutEcommerceTotals(orderForm, items)
 
       return {
         event: 'begin_checkout',
         ecommerce: {
           currency,
-          value: Number(value.toFixed(2)),
-          magentaPoints_value,
+          value: totals.value,
+          magentaPoints_value: totals.magentaPoints_value,
           coupon,
           items,
         },
@@ -76,7 +72,7 @@
       )
 
       log('firing', reason, global.location.hash)
-      pushToDataLayer(buildBeginCheckoutPayload(items, currency, coupon))
+      pushToDataLayer(buildBeginCheckoutPayload(items, currency, coupon, orderForm))
     }
 
     const getFlowStep = () => {

@@ -105,7 +105,7 @@
         orderFormUtils
       )
 
-      const totals = orderFormUtils.buildItemsEcommerceTotals(items)
+      const totals = orderFormUtils.buildCheckoutEcommerceTotals(orderForm, items)
 
       pushToDataLayer(
         buildAddPaymentInfoPayload(items, currency, coupon, payment_type, totals)

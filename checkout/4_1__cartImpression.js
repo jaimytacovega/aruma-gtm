@@ -15,11 +15,19 @@
     enrichOrderFormItems,
     orderFormUtils,
   }) => {
-    let lastViewCartUrl = ''
+    let lastViewCartKey = ''
     let viewCartInFlight = false
 
-    const buildViewCartPayload = (items, currency) => {
-      const totals = orderFormUtils.buildItemsEcommerceTotals(items)
+    const getViewCartKey = (orderForm) =>
+      [
+        global.location.href,
+        orderForm?.value ?? 0,
+        orderForm?.marketingData?.coupon ?? '',
+        orderForm?.items?.length ?? 0,
+      ].join(':')
+
+    const buildViewCartPayload = (items, currency, orderForm) => {
+      const totals = orderFormUtils.buildCheckoutEcommerceTotals(orderForm, items)
 
       return {
         event: 'view_cart',
@@ -37,9 +45,9 @@
         return
       }
 
-      const pageUrl = global.location.href
+      const cartKey = getViewCartKey(orderForm)
 
-      if (pageUrl === lastViewCartUrl || viewCartInFlight) {
+      if (cartKey === lastViewCartKey || viewCartInFlight) {
         return
       }
 
@@ -52,8 +60,8 @@
           orderFormUtils
         )
 
-        pushToDataLayer(buildViewCartPayload(items, currency))
-        lastViewCartUrl = pageUrl
+        pushToDataLayer(buildViewCartPayload(items, currency, orderForm))
+        lastViewCartKey = cartKey
       } finally {
         viewCartInFlight = false
       }
@@ -71,7 +79,7 @@
 
     const onHashChange = () => {
       if (!isCheckoutCartPage()) {
-        lastViewCartUrl = ''
+        lastViewCartKey = ''
         return
       }
 

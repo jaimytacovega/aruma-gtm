@@ -151,19 +151,23 @@
   const buildViewItem = (visible, catalog) => {
     const categoryParts = parseCategoryParts(catalog?.categories)
     const offer = getCommercialOffer(catalog)
-    const listPrice = offer?.ListPrice ?? visible.price
-    const sellingPrice = offer?.Price ?? visible.price
+    const orderUnitPrice = visible.price
+    const orderListPrice = visible.listPrice ?? orderUnitPrice
+    const catalogListPrice = offer?.ListPrice ?? 0
+    const listPrice = Math.max(orderListPrice, catalogListPrice, orderUnitPrice)
     const discount =
-      listPrice > sellingPrice
-        ? Number((listPrice - sellingPrice).toFixed(2))
+      listPrice > orderUnitPrice
+        ? Number((listPrice - orderUnitPrice).toFixed(2))
         : 0
     const isMagentaPoints = isMagentaPointsProduct(catalog)
     const magentaPointsPrice = isMagentaPoints
-      ? resolveMagentaPointsPrice(sellingPrice, listPrice, visible.price)
+      ? resolveMagentaPointsPrice(
+          orderUnitPrice,
+          listPrice,
+          visible.price
+        )
       : 0
-    const itemPrice = isMagentaPoints
-      ? 0
-      : Number((sellingPrice + discount).toFixed(2))
+    const itemPrice = isMagentaPoints ? 0 : Number(listPrice.toFixed(2))
     const itemDiscount = isMagentaPoints ? 0 : discount
     const skuName = catalog?.items?.[0]?.name ?? ''
 
@@ -243,14 +247,24 @@
     }
   }
 
-  const getOrderFormItemUnitPrice = (item) => {
-    const raw = item.sellingPrice ?? item.price ?? 0
+  const getOrderFormMoney = (item, field) => {
+    const raw = item?.[field] ?? 0
 
-    if (item.priceIsInt === false) {
+    if (item?.priceIsInt === false) {
       return raw
     }
 
     return raw / 100
+  }
+
+  const getOrderFormItemUnitPrice = (item) =>
+    getOrderFormMoney(item, 'sellingPrice') || getOrderFormMoney(item, 'price')
+
+  const getOrderFormItemListPrice = (item) => {
+    const listPrice = getOrderFormMoney(item, 'listPrice')
+    const unitPrice = getOrderFormItemUnitPrice(item)
+
+    return listPrice > unitPrice ? listPrice : unitPrice
   }
 
   const enrichOrderFormItems = async (orderItems, orderFormUtils) =>
@@ -276,6 +290,7 @@
             name: orderItem.name,
             brand: orderItem.additionalInfo?.brandName ?? '',
             price: getOrderFormItemUnitPrice(orderItem),
+            listPrice: getOrderFormItemListPrice(orderItem),
             index: index + 1,
             listId,
             listName,

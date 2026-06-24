@@ -797,6 +797,21 @@
       }
     }
 
+    /** Prefer VTEX orderForm.value so coupons and order-level discounts are included. */
+    const buildCheckoutEcommerceTotals = (orderForm, items) => {
+      const itemTotals = buildItemsEcommerceTotals(items)
+      const orderValue = getOrderValue(orderForm)
+
+      if (orderValue > 0) {
+        return {
+          ...itemTotals,
+          value: roundMoney(orderValue),
+        }
+      }
+
+      return itemTotals
+    }
+
     const getSlugFromDetailUrl = (detailUrl) => {
       if (!detailUrl) {
         return ''
@@ -1036,6 +1051,7 @@
       getShipping: (orderForm) => getTotalizerValue(orderForm, 'Shipping'),
       getPurchaseEcommerceTotals,
       buildItemsEcommerceTotals,
+      buildCheckoutEcommerceTotals,
       getSlugFromDetailUrl,
       getListFromLastSelectItem,
       getListContextForOrderItem,
