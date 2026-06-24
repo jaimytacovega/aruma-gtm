@@ -1,3 +1,8 @@
+import {
+  isGenericListContext,
+  saveListContextForProduct,
+} from '../listContextStore'
+
 const PRODUCT_SUMMARY_SELECTOR =
   'section[class*="product-summary"][class*="container"], section.vtex-product-summary-2-x-container'
 
@@ -361,12 +366,40 @@ export const getProductCardFromTarget = (target: Element): HTMLElement | null =>
   return productEl instanceof HTMLElement ? productEl : null
 }
 
-export const captureProductClickTarget = (target: Element): void => {
-  const card = getProductCardFromTarget(target)
+export const getProductCardFromInteractionTarget = (
+  target: Element
+): HTMLElement | null => {
+  const fromLink = getProductCardFromTarget(target)
 
-  if (card) {
-    lastClickedProductCard = card
+  if (fromLink) {
+    return fromLink
   }
+
+  const card = target.closest(PRODUCT_SUMMARY_SELECTOR)
+
+  return card instanceof HTMLElement ? card : null
+}
+
+export const captureProductClickTarget = (target: Element): void => {
+  const card = getProductCardFromInteractionTarget(target)
+
+  if (!card) {
+    return
+  }
+
+  lastClickedProductCard = card
+
+  const visible = buildVisibleProduct(card)
+
+  if (!visible || isGenericListContext(visible)) {
+    return
+  }
+
+  saveListContextForProduct({
+    slug: visible.slug,
+    listId: visible.listId,
+    listName: visible.listName,
+  })
 }
 
 const listContextFromCard = (
@@ -386,15 +419,30 @@ const listContextFromCard = (
   }
 }
 
+const pickBestListContext = (
+  matches: Array<Pick<VisibleProduct, 'listId' | 'listName' | 'index'>>
+): Pick<VisibleProduct, 'listId' | 'listName' | 'index'> | null => {
+  if (!matches.length) {
+    return null
+  }
+
+  const specific = matches.filter((match) => !isGenericListContext(match))
+
+  return specific[0] ?? matches[0] ?? null
+}
+
 /** Resolve list metadata from the clicked shelf/gallery (vtex:productClick list is often wrong). */
 export const resolveProductListFromDom = (
   slug: string
 ): Pick<VisibleProduct, 'listId' | 'listName' | 'index'> | null => {
+  const matches: Array<Pick<VisibleProduct, 'listId' | 'listName' | 'index'>> =
+    []
+
   if (lastClickedProductCard) {
     const fromClick = listContextFromCard(lastClickedProductCard, slug)
 
     if (fromClick) {
-      return fromClick
+      matches.push(fromClick)
     }
   }
 
@@ -414,11 +462,11 @@ export const resolveProductListFromDom = (
     const fromCard = listContextFromCard(card, slug)
 
     if (fromCard) {
-      return fromCard
+      matches.push(fromCard)
     }
   }
 
-  return null
+  return pickBestListContext(matches)
 }
 
 /** Capture phase so the card is stored before vtex:productClick runs. */

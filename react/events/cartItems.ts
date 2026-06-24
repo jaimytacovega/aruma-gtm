@@ -1,5 +1,8 @@
 import { getListContextFromPurchaseContext } from './orderPlaced/orderPlacedUtils'
-import { saveListContextForProduct } from '../listContextStore'
+import {
+  isGenericListContext,
+  saveListContextForProduct,
+} from '../listContextStore'
 import { getListFromLastSelectItem, log, NOT_AVAILABLE } from '../utils'
 import type { AddToCartData } from '../typings/events'
 
@@ -9,7 +12,7 @@ import {
   isMagentaPointsProduct,
 } from './3_1__productImpression/catalog'
 import type { ViewItem } from './3_1__productImpression/catalog'
-import { MAGENTA_POINTS_LIST_LABEL } from './productSummary'
+import { MAGENTA_POINTS_LIST_LABEL, resolveProductListFromDom } from './productSummary'
 
 export type VtexCartItem = AddToCartData['items'][number]
 
@@ -90,10 +93,20 @@ const resolveListContextForCartItem = async (
     return fromPurchaseContext
   }
 
+  const fromDom = resolveProductListFromDom(slug)
+
+  if (fromDom && !isGenericListContext(fromDom)) {
+    return fromDom
+  }
+
   const fromHistory = getListFromLastSelectItem(slug, cartItem.productId)
 
-  if (fromHistory.listId !== NOT_AVAILABLE) {
+  if (!isGenericListContext(fromHistory) && fromHistory.listId !== NOT_AVAILABLE) {
     return fromHistory
+  }
+
+  if (fromDom) {
+    return fromDom
   }
 
   const catalogSlug = getSlugFromDetailUrl(cartItem.detailUrl)

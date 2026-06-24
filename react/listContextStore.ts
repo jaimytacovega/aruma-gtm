@@ -22,6 +22,24 @@ export type ProductListContext = {
     listName: string
 }
 
+const GENERIC_LIST_LABELS = new Set(['listing', 'list of products'])
+
+export const isGenericListContext = (
+    list: ProductListContext | null | undefined
+): boolean => {
+    if (!list) {
+        return true
+    }
+
+    const listId = list.listId.trim().toLowerCase()
+    const listName = list.listName.trim().toLowerCase()
+
+    return (
+        GENERIC_LIST_LABELS.has(listId) ||
+        GENERIC_LIST_LABELS.has(listName)
+    )
+}
+
 type ListContextStore = {
     last: ProductListContext | null
     byProduct: Record<string, ProductListContext>
@@ -160,9 +178,21 @@ const saveListContextForKeys = (
 
         const productKey = normalizeProductKey(String(key))
 
-        if (productKey) {
-            store.byProduct[productKey] = normalized
+        if (!productKey) {
+            continue
         }
+
+        const existing = store.byProduct[productKey]
+
+        if (
+            existing &&
+            isGenericListContext(normalized) &&
+            !isGenericListContext(existing)
+        ) {
+            continue
+        }
+
+        store.byProduct[productKey] = normalized
     }
 
     writeStore(store)
@@ -229,13 +259,32 @@ export const getListContextFromStore = (
     const productIdKey = productId
         ? normalizeProductKey(String(productId))
         : ''
+    const candidates: ProductListContext[] = []
 
     if (slugKey && store.byProduct?.[slugKey]) {
-        return normalizeListContext(store.byProduct[slugKey]) ?? fallback
+        const normalized = normalizeListContext(store.byProduct[slugKey])
+
+        if (normalized) {
+            candidates.push(normalized)
+        }
     }
 
     if (productIdKey && store.byProduct?.[productIdKey]) {
-        return normalizeListContext(store.byProduct[productIdKey]) ?? fallback
+        const normalized = normalizeListContext(store.byProduct[productIdKey])
+
+        if (normalized && !candidates.some((entry) => entry.listId === normalized.listId)) {
+            candidates.push(normalized)
+        }
+    }
+
+    const specific = candidates.filter((entry) => !isGenericListContext(entry))
+
+    if (specific.length) {
+        return specific[0]
+    }
+
+    if (candidates.length) {
+        return candidates[0]
     }
 
     if (store.last) {

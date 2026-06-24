@@ -38,6 +38,21 @@
     }
   }
 
+  const GENERIC_LIST_LABELS = new Set(['listing', 'list of products'])
+
+  const isGenericListContext = (list) => {
+    if (!list) {
+      return true
+    }
+
+    const listId = String(list.listId || '').trim().toLowerCase()
+    const listName = String(list.listName || '').trim().toLowerCase()
+
+    return (
+      GENERIC_LIST_LABELS.has(listId) || GENERIC_LIST_LABELS.has(listName)
+    )
+  }
+
   const readStore = () => {
     try {
       const raw = global.localStorage?.getItem(STORAGE_KEY)
@@ -125,9 +140,21 @@
     for (const key of keys) {
       const productKey = normalizeProductKey(String(key))
 
-      if (productKey) {
-        store.byProduct[productKey] = normalized
+      if (!productKey) {
+        continue
       }
+
+      const existing = store.byProduct[productKey]
+
+      if (
+        existing &&
+        isGenericListContext(normalized) &&
+        !isGenericListContext(existing)
+      ) {
+        continue
+      }
+
+      store.byProduct[productKey] = normalized
     }
 
     writeStore(store)
@@ -181,6 +208,22 @@
       const productIdKey = productId
         ? normalizeProductKey(String(productId))
         : ''
+
+      if (slugKey && store.byProduct?.[slugKey]) {
+        const normalized = normalizeListContext(store.byProduct[slugKey])
+
+        if (normalized && !isGenericListContext(normalized)) {
+          return normalized
+        }
+      }
+
+      if (productIdKey && store.byProduct?.[productIdKey]) {
+        const normalized = normalizeListContext(store.byProduct[productIdKey])
+
+        if (normalized && !isGenericListContext(normalized)) {
+          return normalized
+        }
+      }
 
       if (slugKey && store.byProduct?.[slugKey]) {
         return normalizeListContext(store.byProduct[slugKey]) ?? fallback

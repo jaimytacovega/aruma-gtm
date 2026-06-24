@@ -2,6 +2,7 @@ import { canUseDOM } from 'vtex.render-runtime'
 
 import {
     getListContextFromStore,
+    isGenericListContext,
     persistListContextFromPayload,
 } from './listContextStore'
 import type { ProductListContext } from './listContextStore'
@@ -124,6 +125,23 @@ const listEventMatchesProduct = (
     return false
 }
 
+const listContextScore = (
+    eventName: string,
+    list: ProductListContext
+): number => {
+    let score = 0
+
+    if (eventName === 'select_item') {
+        score += 2
+    }
+
+    if (!isGenericListContext(list)) {
+        score += 1
+    }
+
+    return score
+}
+
 /** List context from last select_item / view_item_list for this product, else last list event. */
 const getListFromLastSelectItem = (
     slug: string,
@@ -139,6 +157,8 @@ const getListFromLastSelectItem = (
 
     window.dataLayer = window.dataLayer || []
     let lastListContext: ProductListContext | null = null
+    let bestProductMatch: ProductListContext | null = null
+    let bestProductScore = -1
 
     for (let index = window.dataLayer.length - 1; index >= 0; index -= 1) {
         const entry = window.dataLayer[index]
@@ -157,16 +177,37 @@ const getListFromLastSelectItem = (
             lastListContext = list
         }
 
-        if (listEventMatchesProduct(entry, slug, productId)) {
-            return list
+        if (!listEventMatchesProduct(entry, slug, productId)) {
+            continue
         }
+
+        const score = listContextScore(String(entry.event), list)
+
+        if (score > bestProductScore) {
+            bestProductScore = score
+            bestProductMatch = list
+        }
+    }
+
+    if (bestProductMatch) {
+        return bestProductMatch
+    }
+
+    if (lastListContext && !isGenericListContext(lastListContext)) {
+        return lastListContext
+    }
+
+    const fromStore = getListContextFromStore(slug, productId, fallback)
+
+    if (!isGenericListContext(fromStore) && fromStore.listId !== NOT_AVAILABLE) {
+        return fromStore
     }
 
     if (lastListContext) {
         return lastListContext
     }
 
-    return getListContextFromStore(slug, productId, fallback)
+    return fromStore
 }
 
 const pushToDataLayer = (payload: Record<string, unknown>, disableLog: boolean = false) => {

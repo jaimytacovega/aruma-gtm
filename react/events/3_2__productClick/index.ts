@@ -1,4 +1,5 @@
 import { pushToDataLayer, log } from '../../utils'
+import { saveListContextForProduct } from '../../listContextStore'
 import type { ProductClickData, ProductSummary } from '../../typings/events'
 
 import {
@@ -84,6 +85,13 @@ const productClick = async (data: ProductClickData) => {
   const domList = resolveProductListFromDom(slug)
   const listId = domList?.listId ?? data.list ?? 'listing'
   const listName = domList?.listName ?? data.list ?? 'List of products'
+
+  saveListContextForProduct({
+    slug,
+    productId: String(data.product.productId ?? ''),
+    listId,
+    listName,
+  })
 
   await fireSelectItemFromVisible({
     slug,
