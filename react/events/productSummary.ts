@@ -83,7 +83,18 @@ const SECTION_TITLE_SELECTOR = [
   '[class*="paragraph--sectionBlockTitle"]',
 ].join(', ')
 
-const SHELF_CONTAINER_SELECTOR = '[class*="sliderLayoutContainer"]'
+/** Home shelves (slider-layout) and PDP related products (vtex-shelf). */
+const SHELF_CONTAINER_SELECTOR = [
+  '[class*="sliderLayoutContainer"]',
+  '[class*="shelfContentContainer"]',
+  '[class*="relatedProducts"]',
+].join(', ')
+
+const SHELF_PRODUCT_SCOPE_SELECTOR = [
+  '[class*="shelfContentContainer"]',
+  '[class*="sliderLayoutContainer"]',
+  '[class*="relatedProducts"]',
+].join(', ')
 
 export const MAGENTA_POINTS_LIST_LABEL = 'Magenta Points'
 const MAGENTA_POINTS_BIENVENIDO_PATH = '/magenta-points/bienvenido'
@@ -144,6 +155,16 @@ const getClosestPrecedingTitleInRoot = (
 }
 
 const getSliderSectionTitle = (shelf: HTMLElement): string => {
+  const shelfRoot = shelf.closest('[class*="relatedProducts"]')
+
+  if (shelfRoot) {
+    const title = readSectionTitle(shelfRoot)
+
+    if (title) {
+      return title
+    }
+  }
+
   const sectionRoot = shelf.closest(SECTION_ROOT_SELECTOR)
 
   if (!sectionRoot) {
@@ -294,7 +315,8 @@ export const getProductIndex = (
 
   const shelf = productEl.closest(SHELF_CONTAINER_SELECTOR)
   const scope =
-    shelf instanceof HTMLElement ? shelf : listRoot
+    productEl.closest(SHELF_PRODUCT_SCOPE_SELECTOR) ??
+    (shelf instanceof HTMLElement ? shelf : listRoot)
 
   const cards = Array.from(
     scope.querySelectorAll(PRODUCT_SUMMARY_SELECTOR)

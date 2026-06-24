@@ -20,7 +20,8 @@ const DESKTOP_VISIBILITY_THRESHOLD = 0.25
 const MOBILE_VISIBILITY_THRESHOLD = 0.75
 const MOBILE_MAX_WIDTH = 768
 
-const SLIDE_SELECTOR = '[class*="slider-layout-0-x-slide"]'
+const SLIDE_SELECTOR =
+  '[class*="slider-layout-0-x-slide"], [class*="shelf-1-x-slide"], [class*="shelf-"][class*="slide"]'
 
 /** Products seen in the same viewport wave (scroll stop / mount burst) flush together. */
 const BATCH_DEBOUNCE_MS = 200
