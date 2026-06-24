@@ -1,4 +1,5 @@
 import { pushToDataLayer } from '../../utils'
+import { cancelPendingImpressions } from '../3_1__productImpression'
 
 const MENU_NAV_SELECTOR = '[class*="menuContainerNav--sticky-header-menu"]'
 const MENU_ITEM_SELECTOR = 'a, span[class*="styledLink"]'
@@ -23,6 +24,8 @@ const homeHeaderMenu = (target: Element) => {
 
   const cta = getMenuItemCta(menuItem)
   if (!cta) return
+
+  cancelPendingImpressions()
 
   pushToDataLayer({
     event: 'virtualEvent',

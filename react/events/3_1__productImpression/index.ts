@@ -28,20 +28,91 @@ const BATCH_DEBOUNCE_MS = 200
 type PendingEntry = {
   product: VisibleProduct
   el: HTMLElement
+  pageKey: string
 }
 
 const observedProducts = new Set<Element>()
 /** Once per page: list + slug — scroll back does not log again. */
 const loggedProductKeys = new Set<string>()
+/** Slugs already sent in view_item_list for a page + list (allows scroll batches). */
+const sentProductsByListSession = new Map<string, Set<string>>()
 
 let intersectionObserver: IntersectionObserver | null = null
 let domObserver: MutationObserver | null = null
 let trackingActive = false
 let batchLogCount = 0
 let batchFlushTimer: number | null = null
+let lastImpressionPageKey = ''
+let navigationWatcherInstalled = false
+let flushInProgress = false
 
 /** Pending products per list — flushed only when still in viewport at flush time. */
 const pendingByList = new Map<string, PendingEntry[]>()
+
+const getImpressionPageKey = (): string =>
+  `${window.location.pathname}${window.location.search}`
+
+const getListSessionKey = (listId: string, pageKey: string): string =>
+  `${pageKey}:${listId}`
+
+const getSentProductsForList = (listId: string, pageKey: string): Set<string> => {
+  const sessionKey = getListSessionKey(listId, pageKey)
+  let sent = sentProductsByListSession.get(sessionKey)
+
+  if (!sent) {
+    sent = new Set()
+    sentProductsByListSession.set(sessionKey, sent)
+  }
+
+  return sent
+}
+
+const getProductDedupeKey = (product: VisibleProduct): string => product.slug
+
+const cancelPendingImpressions = () => {
+  if (batchFlushTimer !== null) {
+    window.clearTimeout(batchFlushTimer)
+    batchFlushTimer = null
+  }
+
+  pendingByList.clear()
+}
+
+const installNavigationWatcher = () => {
+  if (navigationWatcherInstalled || !canUseDOM) {
+    return
+  }
+
+  navigationWatcherInstalled = true
+
+  const onRouteChange = () => {
+    cancelPendingImpressions()
+  }
+
+  window.addEventListener('popstate', onRouteChange)
+
+  for (const method of ['pushState', 'replaceState'] as const) {
+    const original = window.history[method].bind(window.history)
+
+    window.history[method] = (
+      ...args: Parameters<History['pushState']>
+    ) => {
+      onRouteChange()
+      return original(...args)
+    }
+  }
+}
+
+const isSearchRoute = (): boolean =>
+  window.location.pathname.includes('/search') ||
+  window.location.search.includes('_q=')
+
+const hasSearchQuery = (): boolean =>
+  Boolean(new URLSearchParams(window.location.search).get('_q')?.trim())
+
+/** VTEX search often hydrates without _q first, then updates URL — defer to avoid two list ids. */
+const shouldDeferSearchImpression = (): boolean =>
+  isSearchRoute() && !hasSearchQuery()
 
 const isMobileViewport = (): boolean =>
   window.innerWidth < MOBILE_MAX_WIDTH
@@ -136,71 +207,99 @@ const isAlreadyPending = (key: string): boolean => {
 }
 
 const flushPendingBatches = async () => {
-  if (pendingByList.size === 0) {
+  if (pendingByList.size === 0 || flushInProgress) {
     return
   }
 
-  let hasRemainingPending = false
+  flushInProgress = true
+  const currentPageKey = getImpressionPageKey()
 
-  for (const [listId, entries] of pendingByList.entries()) {
-    const ready: PendingEntry[] = []
-    const stillPending: PendingEntry[] = []
+  try {
+    let hasRemainingPending = false
 
-    for (const entry of entries) {
-      if (!entry.el.isConnected) {
-        continue
+    for (const [listId, entries] of pendingByList.entries()) {
+      const ready: PendingEntry[] = []
+      const stillPending: PendingEntry[] = []
+
+      for (const entry of entries) {
+        if (entry.pageKey !== currentPageKey) {
+          continue
+        }
+
+        if (!entry.el.isConnected) {
+          continue
+        }
+
+        if (isProductVisible(entry.el)) {
+          ready.push(entry)
+          loggedProductKeys.add(getLogKey(entry.product))
+        } else {
+          stillPending.push(entry)
+        }
       }
 
-      if (isProductVisible(entry.el)) {
-        ready.push(entry)
-        loggedProductKeys.add(getLogKey(entry.product))
-      } else {
-        stillPending.push(entry)
-      }
-    }
+      if (ready.length > 0) {
+        const sentProducts = getSentProductsForList(listId, currentPageKey)
+        const newReady = ready.filter(
+          (entry) => !sentProducts.has(getProductDedupeKey(entry.product))
+        )
 
-    if (ready.length > 0) {
-      const sorted = [...ready].sort(
-        (a, b) => a.product.index - b.product.index
-      )
+        if (newReady.length > 0) {
+          const sorted = [...newReady].sort(
+            (a, b) => a.product.index - b.product.index
+          )
 
-      const items = await Promise.all(
-        sorted.map(async (entry) => {
-          let catalog = null
+          const items = await Promise.all(
+            sorted.map(async (entry) => {
+              let catalog = null
 
-          try {
-            catalog = await fetchCatalogProduct(entry.product.slug)
-          } catch (error) {
-            log('catalog impression fetch failed', error)
+              try {
+                catalog = await fetchCatalogProduct(entry.product.slug)
+              } catch (error) {
+                log('catalog impression fetch failed', error)
+              }
+
+              return buildViewItem(entry.product, catalog)
+            })
+          )
+
+          for (const entry of sorted) {
+            sentProducts.add(getProductDedupeKey(entry.product))
           }
 
-          return buildViewItem(entry.product, catalog)
-        })
-      )
+          const { listName } = sorted[0].product
 
-      const { listName } = sorted[0].product
+          batchLogCount += 1
 
-      batchLogCount += 1
+          const payload = buildViewItemListPayload(items, listId, listName)
 
-      const payload = buildViewItemListPayload(items, listId, listName)
+          pushToDataLayer(payload)
+        } else {
+          log('skip view_item_list — no new products', listId)
+        }
+      }
 
-      pushToDataLayer(payload)
+      if (stillPending.length > 0) {
+        pendingByList.set(listId, stillPending)
+        hasRemainingPending = true
+      } else {
+        pendingByList.delete(listId)
+      }
     }
 
-    if (stillPending.length > 0) {
-      pendingByList.set(listId, stillPending)
-      hasRemainingPending = true
-    } else {
-      pendingByList.delete(listId)
+    if (hasRemainingPending) {
+      scheduleBatchFlush()
     }
-  }
-
-  if (hasRemainingPending) {
-    scheduleBatchFlush()
+  } finally {
+    flushInProgress = false
   }
 }
 
 const queueVisibleProduct = (productEl: HTMLElement) => {
+  if (shouldDeferSearchImpression()) {
+    return
+  }
+
   if (!isProductVisible(productEl)) {
     return
   }
@@ -221,7 +320,7 @@ const queueVisibleProduct = (productEl: HTMLElement) => {
 
   prefetchCatalogProduct(product.slug)
 
-  batch.push({ product, el: productEl })
+  batch.push({ product, el: productEl, pageKey: getImpressionPageKey() })
   pendingByList.set(product.listId, batch)
   scheduleBatchFlush()
 }
@@ -273,12 +372,7 @@ const handleIntersection: IntersectionObserverCallback = (entries) => {
 }
 
 const disconnectProductImpression = () => {
-  if (batchFlushTimer !== null) {
-    window.clearTimeout(batchFlushTimer)
-    batchFlushTimer = null
-  }
-
-  void flushPendingBatches()
+  cancelPendingImpressions()
 
   intersectionObserver?.disconnect()
   domObserver?.disconnect()
@@ -286,6 +380,7 @@ const disconnectProductImpression = () => {
   domObserver = null
   observedProducts.clear()
   loggedProductKeys.clear()
+  sentProductsByListSession.clear()
   pendingByList.clear()
   clearCatalogCache()
   trackingActive = false
@@ -296,6 +391,8 @@ const connectProductImpression = () => {
   if (!canUseDOM || trackingActive) {
     return
   }
+
+  installNavigationWatcher()
 
   intersectionObserver = new IntersectionObserver(handleIntersection, {
     threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
@@ -340,8 +437,17 @@ const registerProductImpression = () => {
     return
   }
 
+  const pageKey = getImpressionPageKey()
+
+  // Search/PLP often emit multiple vtex:pageView for the same URL while hydrating.
+  if (pageKey === lastImpressionPageKey && trackingActive) {
+    scanForProducts()
+    return
+  }
+
+  lastImpressionPageKey = pageKey
   disconnectProductImpression()
   connectProductImpression()
 }
 
-export { registerProductImpression, disconnectProductImpression }
+export { registerProductImpression, disconnectProductImpression, cancelPendingImpressions }
