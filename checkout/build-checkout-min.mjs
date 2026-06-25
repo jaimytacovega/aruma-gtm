@@ -16,6 +16,7 @@ const SOURCES = [
   'checkoutCartItems.js',
   'checkoutOrderFormUtils.js',
   '3_5__addToCart.js',
+  'recommendedCarousel.js',
   '4_2__removeFromCart.js',
   '4_1__cartImpression.js',
   '5_1_2__startCheckout.js',

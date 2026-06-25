@@ -301,8 +301,53 @@
       })
     )
 
+  const getItemNetValue = (item) =>
+    Number(((item.price - item.discount) * item.quantity).toFixed(2))
+
+  const buildViewItemListPayload = (items, item_list_id, item_list_name) => ({
+    event: 'view_item_list',
+    ecommerce: {
+      item_list_id,
+      item_list_name,
+      items,
+    },
+  })
+
+  const buildSelectItemPayload = (item) => ({
+    event: 'select_item',
+    ecommerce: {
+      item_list_id: item.item_list_id,
+      item_list_name: item.item_list_name,
+      items: [item],
+    },
+  })
+
+  const buildAddToCartPayload = (items, currency) => {
+    const value = items.reduce((sum, item) => sum + getItemNetValue(item), 0)
+    const magentaPoints_value = items.reduce(
+      (sum, item) => sum + item.magentaPoints_price * item.quantity,
+      0
+    )
+
+    return {
+      event: 'add_to_cart',
+      ecommerce: {
+        currency,
+        value: Number(value.toFixed(2)),
+        magentaPoints_value,
+        items,
+      },
+    }
+  }
+
   global.createCheckoutCartItems = () => ({
     NOT_AVAILABLE,
     enrichOrderFormItems,
+    buildViewItem,
+    fetchCatalogProduct,
+    getSlugFromDetailUrl,
+    buildViewItemListPayload,
+    buildSelectItemPayload,
+    buildAddToCartPayload,
   })
 })(window)

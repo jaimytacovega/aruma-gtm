@@ -11,20 +11,21 @@
  * 4. checkout/checkoutCartItems.js
  * 5. checkout/checkoutOrderFormUtils.js
  * 6. checkout/3_5__addToCart.js
- * 7. checkout/4_2__removeFromCart.js
- * 8. checkout/4_1__cartImpression.js
- * 9. checkout/5_1_2__startCheckout.js
- * 10. checkout/5_1_3__companyInfo.js
- * 11. checkout/5_1_4__submitCompanyInfo.js
- * 12. checkout/5_2_1__shippingScreening.js
- * 13. checkout/5_2_2__submitShipping.js
- * 14. checkout/5_2_3__shippingPickButton.js
- * 15. checkout/5_3_1__paymentScreening.js
- * 16. checkout/5_3_2__paymentInfo.js
- * 17. checkout/5_3_3__paymentPickButton.js
- * 18. checkout/5_4_1__successPaymentScreening.js
- * 19. checkout/5_4_2__successPayment.js
- * 20. This file
+ * 7. checkout/recommendedCarousel.js
+ * 8. checkout/4_2__removeFromCart.js
+ * 9. checkout/4_1__cartImpression.js
+ * 10. checkout/5_1_2__startCheckout.js
+ * 11. checkout/5_1_3__companyInfo.js
+ * 12. checkout/5_1_4__submitCompanyInfo.js
+ * 13. checkout/5_2_1__shippingScreening.js
+ * 14. checkout/5_2_2__submitShipping.js
+ * 15. checkout/5_2_3__shippingPickButton.js
+ * 16. checkout/5_3_1__paymentScreening.js
+ * 17. checkout/5_3_2__paymentInfo.js
+ * 18. checkout/5_3_3__paymentPickButton.js
+ * 19. checkout/5_4_1__successPaymentScreening.js
+ * 20. checkout/5_4_2__successPayment.js
+ * 21. This file
  */
 ;(() => {
   if (window.__arumaGtmCheckoutInitialized) {
@@ -69,6 +70,13 @@
   if (typeof window.create3_5__addToCart !== 'function') {
     console.error(
       '[aruma-gtm] Missing create3_5__addToCart. Paste checkout/3_5__addToCart.js first.'
+    )
+    return
+  }
+
+  if (typeof window.createRecommendedCarousel !== 'function') {
+    console.error(
+      '[aruma-gtm] Missing createRecommendedCarousel. Paste checkout/recommendedCarousel.js first.'
     )
     return
   }
@@ -172,7 +180,8 @@
     console.info('[aruma-gtm]', ...args)
   }
 
-  const { NOT_AVAILABLE, enrichOrderFormItems } = window.createCheckoutCartItems()
+  const cartItems = window.createCheckoutCartItems()
+  const { NOT_AVAILABLE, enrichOrderFormItems } = cartItems
   const listContextStore = window.createListContextStore(NOT_AVAILABLE)
   const orderFormUtils = window.createCheckoutOrderFormUtils(NOT_AVAILABLE)
 
@@ -185,6 +194,8 @@
   const isCheckoutCartPage = () =>
     window.location.pathname.includes('/checkout') &&
     window.location.hash.includes('/cart')
+
+  const isCheckoutPage = () => window.location.pathname.includes('/checkout')
 
   let lastAnalyticsUrl = ''
 
@@ -245,6 +256,15 @@
     pushToDataLayer,
     enrichOrderFormItems,
     orderFormUtils,
+  })
+
+  const recommendedCarousel = window.createRecommendedCarousel({
+    isCheckoutPage,
+    pushToDataLayer,
+    listContextStore,
+    cartItems,
+    orderFormUtils,
+    normalizeText,
   })
 
   const removeFromCart = window.create4_2__removeFromCart({
@@ -356,6 +376,7 @@
     pushAnalyticsLoaded()
     cartImpression()
     addToCart()
+    recommendedCarousel()
     removeFromCart()
     checkoutScreening.attach()
     startCheckout()

@@ -3,6 +3,14 @@ import {
   saveListContextForProduct,
 } from '../listContextStore'
 
+import {
+  buildGoPersonalVisibleProduct,
+  GOPERSONAL_PRODUCT_SELECTOR,
+  GOPERSONAL_ROOT_SELECTOR,
+  getGoPersonalProductId,
+  isGoPersonalProduct,
+} from './goPersonal'
+
 const PRODUCT_SUMMARY_SELECTOR =
   'section[class*="product-summary"][class*="container"], section.vtex-product-summary-2-x-container'
 
@@ -335,6 +343,10 @@ export const getProductIndex = (
 export const buildVisibleProduct = (
   productEl: HTMLElement
 ): VisibleProduct | null => {
+  if (isGoPersonalProduct(productEl)) {
+    return buildGoPersonalVisibleProduct(productEl)
+  }
+
   const slug = getProductSlug(productEl)
 
   if (!slug) {
@@ -377,7 +389,13 @@ export const getProductCardFromInteractionTarget = (
 
   const card = target.closest(PRODUCT_SUMMARY_SELECTOR)
 
-  return card instanceof HTMLElement ? card : null
+  if (card instanceof HTMLElement) {
+    return card
+  }
+
+  const goPersonalCard = target.closest(GOPERSONAL_PRODUCT_SELECTOR)
+
+  return goPersonalCard instanceof HTMLElement ? goPersonalCard : null
 }
 
 export const captureProductClickTarget = (target: Element): void => {
@@ -397,6 +415,9 @@ export const captureProductClickTarget = (target: Element): void => {
 
   saveListContextForProduct({
     slug: visible.slug,
+    productId: isGoPersonalProduct(card)
+      ? getGoPersonalProductId(card)
+      : undefined,
     listId: visible.listId,
     listName: visible.listName,
   })
@@ -453,7 +474,9 @@ export const resolveProductListFromDom = (
       continue
     }
 
-    const card = link.closest(PRODUCT_SUMMARY_SELECTOR)
+    const card =
+      link.closest(PRODUCT_SUMMARY_SELECTOR) ??
+      link.closest(GOPERSONAL_PRODUCT_SELECTOR)
 
     if (!(card instanceof HTMLElement)) {
       continue
@@ -465,6 +488,18 @@ export const resolveProductListFromDom = (
       matches.push(fromCard)
     }
   }
+
+  document.querySelectorAll(GOPERSONAL_PRODUCT_SELECTOR).forEach((node) => {
+    if (!(node instanceof HTMLElement)) {
+      return
+    }
+
+    const fromCard = listContextFromCard(node, slug)
+
+    if (fromCard) {
+      matches.push(fromCard)
+    }
+  })
 
   return pickBestListContext(matches)
 }
@@ -487,4 +522,4 @@ export const setupProductClickCapture = (): void => {
   productClickCaptureAttached = true
 }
 
-export { PRODUCT_SUMMARY_SELECTOR }
+export { PRODUCT_SUMMARY_SELECTOR, GOPERSONAL_PRODUCT_SELECTOR, GOPERSONAL_ROOT_SELECTOR }

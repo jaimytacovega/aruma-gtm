@@ -9,11 +9,13 @@ import {
 } from '../3_1__productImpression/catalog'
 import {
   buildVisibleProduct,
+  getProductCardFromInteractionTarget,
   getProductCardFromTarget,
   isSearchAutocompleteProductCard,
   resolveProductListFromDom,
 } from '../productSummary'
 import type { VisibleProduct } from '../productSummary'
+import { isGoPersonalProduct } from '../goPersonal'
 
 const getPriceFromProduct = (product: ProductSummary): number =>
   product.sku?.seller?.commertialOffer?.Price ??
@@ -21,6 +23,7 @@ const getPriceFromProduct = (product: ProductSummary): number =>
   0
 
 let searchAutocompleteClickAttached = false
+let goPersonalClickAttached = false
 
 const fireSelectItemFromVisible = async (visible: VisibleProduct): Promise<void> => {
   let catalog = null
@@ -73,6 +76,32 @@ export const setupSearchAutocompleteProductClick = (): void => {
     true
   )
   searchAutocompleteClickAttached = true
+}
+
+/** GoPersonal shelves inject async and do not emit vtex:productClick. */
+export const setupGoPersonalProductClick = (): void => {
+  if (goPersonalClickAttached || typeof document === 'undefined') {
+    return
+  }
+
+  document.addEventListener(
+    'click',
+    (event) => {
+      if (!(event.target instanceof Element)) {
+        return
+      }
+
+      const card = getProductCardFromInteractionTarget(event.target)
+
+      if (!card || !isGoPersonalProduct(card)) {
+        return
+      }
+
+      void fireSelectItemFromProductCard(card)
+    },
+    true
+  )
+  goPersonalClickAttached = true
 }
 
 const productClick = async (data: ProductClickData) => {

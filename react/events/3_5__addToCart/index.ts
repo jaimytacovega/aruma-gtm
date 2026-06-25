@@ -4,6 +4,7 @@ import type { AddToCartData } from '../../typings/events'
 import { buildAddToCartPayload } from '../3_1__productImpression/catalog'
 import { enrichCartItemsWithStoredListContext } from '../cartItems'
 
+import { setupGoPersonalAddToCartCapture } from './goPersonalAddToCartClick'
 import { setupMagentaRedeemAddToCartCapture } from './magentaRedeemClick'
 
 const addToCart = async (data: AddToCartData) => {
@@ -17,4 +18,8 @@ const addToCart = async (data: AddToCartData) => {
   pushToDataLayer(payload)
 }
 
-export { addToCart, setupMagentaRedeemAddToCartCapture }
+export {
+  addToCart,
+  setupGoPersonalAddToCartCapture,
+  setupMagentaRedeemAddToCartCapture,
+}

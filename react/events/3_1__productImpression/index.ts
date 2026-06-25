@@ -11,6 +11,8 @@ import {
 } from './catalog'
 import {
   buildVisibleProduct,
+  GOPERSONAL_PRODUCT_SELECTOR,
+  GOPERSONAL_ROOT_SELECTOR,
   PRODUCT_SUMMARY_SELECTOR,
 } from '../productSummary'
 import type { VisibleProduct } from '../productSummary'
@@ -21,7 +23,7 @@ const MOBILE_VISIBILITY_THRESHOLD = 0.75
 const MOBILE_MAX_WIDTH = 768
 
 const SLIDE_SELECTOR =
-  '[class*="slider-layout-0-x-slide"], [class*="shelf-1-x-slide"], [class*="shelf-"][class*="slide"]'
+  '[class*="slider-layout-0-x-slide"], [class*="shelf-1-x-slide"], [class*="shelf-"][class*="slide"], [data-gopersonal="true"] [class*="slide_"]'
 
 /** Products seen in the same viewport wave (scroll stop / mount burst) flush together. */
 const BATCH_DEBOUNCE_MS = 200
@@ -330,12 +332,28 @@ const collectNewlyVisible = (productEl: HTMLElement) => {
   queueVisibleProduct(productEl)
 }
 
-const syncVisibleProducts = () => {
-  document.querySelectorAll(PRODUCT_SUMMARY_SELECTOR).forEach((node) => {
-    if (!(node instanceof HTMLElement)) {
-      return
-    }
+const forEachTrackedProduct = (
+  callback: (productEl: HTMLElement) => void
+): void => {
+  for (const selector of [PRODUCT_SUMMARY_SELECTOR, GOPERSONAL_PRODUCT_SELECTOR]) {
+    document.querySelectorAll(selector).forEach((node) => {
+      if (node instanceof HTMLElement) {
+        callback(node)
+      }
+    })
+  }
+}
 
+const nodeHasTrackedProducts = (node: Element): boolean =>
+  node.matches(PRODUCT_SUMMARY_SELECTOR) ||
+  node.matches(GOPERSONAL_PRODUCT_SELECTOR) ||
+  node.matches(GOPERSONAL_ROOT_SELECTOR) ||
+  Boolean(node.querySelector(PRODUCT_SUMMARY_SELECTOR)) ||
+  Boolean(node.querySelector(GOPERSONAL_PRODUCT_SELECTOR)) ||
+  Boolean(node.querySelector(GOPERSONAL_ROOT_SELECTOR))
+
+const syncVisibleProducts = () => {
+  forEachTrackedProduct((node) => {
     observeProduct(node)
     collectNewlyVisible(node)
   })
@@ -351,12 +369,7 @@ const observeProduct = (productEl: HTMLElement) => {
 }
 
 const scanForProducts = () => {
-  document.querySelectorAll(PRODUCT_SUMMARY_SELECTOR).forEach((node) => {
-    if (node instanceof HTMLElement) {
-      observeProduct(node)
-    }
-  })
-
+  forEachTrackedProduct(observeProduct)
   syncVisibleProducts()
 }
 
@@ -410,10 +423,7 @@ const connectProductImpression = () => {
           continue
         }
 
-        if (
-          node.matches(PRODUCT_SUMMARY_SELECTOR) ||
-          node.querySelector(PRODUCT_SUMMARY_SELECTOR)
-        ) {
+        if (nodeHasTrackedProducts(node)) {
           hasNewProducts = true
         }
       }

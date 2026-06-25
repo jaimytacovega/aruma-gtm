@@ -43,11 +43,16 @@ import { setupProductClickCapture } from './events/productSummary'
 import { fetchCatalogProduct } from './events/3_1__productImpression/catalog'
 import {
     productClick,
+    setupGoPersonalProductClick,
     setupSearchAutocompleteProductClick,
 } from './events/3_2__productClick'
 import { productDetail } from './events/3_3__productDetail'
 import { addToWishlist } from './events/3_4__addToWishlist'
-import { addToCart, setupMagentaRedeemAddToCartCapture } from './events/3_5__addToCart'
+import {
+    addToCart,
+    setupGoPersonalAddToCartCapture,
+    setupMagentaRedeemAddToCartCapture,
+} from './events/3_5__addToCart'
 import { cartImpression } from './events/4_1__cartImpression'
 import { removeFromCart } from './events/4_2__removeFromCart'
 import { handleOrderPlacedPage } from './events/orderPlaced'
@@ -91,8 +96,10 @@ const setupDomClickListeners = () => {
     setupProductClickCapture()
     setupPromotionClickCapture()
     setupSearchAutocompleteProductClick()
+    setupGoPersonalProductClick()
     setupLoginAwaitingCapture()
     setupMagentaRedeemAddToCartCapture(addToCart)
+    setupGoPersonalAddToCartCapture(addToCart)
     domClickListenerAttached = true
 }
 
@@ -211,7 +218,9 @@ if (canUseDOM) {
     setupDomClickListeners()
     setupProductClickCapture()
     setupSearchAutocompleteProductClick()
+    setupGoPersonalProductClick()
     setupMagentaRedeemAddToCartCapture(addToCart)
+    setupGoPersonalAddToCartCapture(addToCart)
 
     // 2.3.1.1 Register Login Modal
     registerLoginModal()
