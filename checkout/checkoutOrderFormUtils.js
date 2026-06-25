@@ -801,15 +801,26 @@
     const buildCheckoutEcommerceTotals = (orderForm, items) => {
       const itemTotals = buildItemsEcommerceTotals(items)
       const orderValue = getOrderValue(orderForm)
+      const magentaPointsValue = itemTotals.magentaPoints_value
 
-      if (orderValue > 0) {
-        return {
-          ...itemTotals,
-          value: roundMoney(orderValue),
-        }
+      if (orderValue <= 0) {
+        return itemTotals
       }
 
-      return itemTotals
+      let value = roundMoney(orderValue)
+
+      // VTEX orderForm.value treats magenta points like PEN — exclude them from value.
+      if (
+        magentaPointsValue > 0 &&
+        orderValue > itemTotals.value + 0.009
+      ) {
+        value = roundMoney(Math.max(0, orderValue - magentaPointsValue))
+      }
+
+      return {
+        ...itemTotals,
+        value,
+      }
     }
 
     const getSlugFromDetailUrl = (detailUrl) => {

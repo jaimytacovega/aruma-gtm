@@ -137,15 +137,22 @@
   const getCommercialOffer = (catalog) =>
     catalog?.items?.[0]?.sellers?.[0]?.commertialOffer ?? null
 
-  const resolveMagentaPointsPrice = (sellingPrice, listPrice, visiblePrice) => {
-    const price =
-      sellingPrice > 0
-        ? sellingPrice
-        : listPrice > 0
-          ? listPrice
-          : visiblePrice
+  const resolveMagentaPointsPrice = (offer, orderListPrice, orderUnitPrice) => {
+    const catalogListPrice = offer?.ListPrice ?? 0
+    const catalogPrice = offer?.Price ?? 0
 
-    return Number(price.toFixed(2))
+    if (catalogListPrice > 0) {
+      return Number(catalogListPrice.toFixed(2))
+    }
+
+    if (catalogPrice > 0) {
+      return Number(catalogPrice.toFixed(2))
+    }
+
+    const listPrice =
+      orderListPrice > orderUnitPrice ? orderListPrice : orderUnitPrice
+
+    return Number(listPrice.toFixed(2))
   }
 
   const buildViewItem = (visible, catalog) => {
@@ -161,11 +168,7 @@
         : 0
     const isMagentaPoints = isMagentaPointsProduct(catalog)
     const magentaPointsPrice = isMagentaPoints
-      ? resolveMagentaPointsPrice(
-          orderUnitPrice,
-          listPrice,
-          visible.price
-        )
+      ? resolveMagentaPointsPrice(offer, orderListPrice, orderUnitPrice)
       : 0
     const itemPrice = isMagentaPoints ? 0 : Number(listPrice.toFixed(2))
     const itemDiscount = isMagentaPoints ? 0 : discount

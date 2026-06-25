@@ -326,18 +326,25 @@ export const fetchCatalogProduct = async (
 }
 
 const resolveMagentaPointsPrice = (
-  sellingPrice: number,
-  listPrice: number,
-  visiblePrice: number
+  offer: CatalogOffer | null | undefined,
+  orderListPrice: number,
+  orderUnitPrice: number
 ): number => {
-  const price =
-    sellingPrice > 0
-      ? sellingPrice
-      : listPrice > 0
-        ? listPrice
-        : visiblePrice
+  const catalogListPrice = offer?.ListPrice ?? 0
+  const catalogPrice = offer?.Price ?? 0
 
-  return Number(price.toFixed(2))
+  if (catalogListPrice > 0) {
+    return Number(catalogListPrice.toFixed(2))
+  }
+
+  if (catalogPrice > 0) {
+    return Number(catalogPrice.toFixed(2))
+  }
+
+  const listPrice =
+    orderListPrice > orderUnitPrice ? orderListPrice : orderUnitPrice
+
+  return Number(listPrice.toFixed(2))
 }
 
 export const buildViewItem = (
@@ -346,15 +353,18 @@ export const buildViewItem = (
 ): ViewItem => {
   const categoryParts = parseCategoryParts(catalog?.categories)
   const offer = getCommercialOffer(catalog)
-  const listPrice = offer?.ListPrice ?? visible.listPrice ?? visible.price
-  const sellingPrice = offer?.Price ?? visible.price
+  const orderUnitPrice = visible.price
+  const orderListPrice = visible.listPrice ?? orderUnitPrice
+  const catalogListPrice = offer?.ListPrice ?? 0
+  const listPrice = Math.max(orderListPrice, catalogListPrice, orderUnitPrice)
+  const sellingPrice = orderUnitPrice
   const discount =
     listPrice > sellingPrice
       ? Number((listPrice - sellingPrice).toFixed(2))
       : 0
   const isMagentaPoints = isMagentaPointsProduct(catalog, visible.categories)
   const magentaPointsPrice = isMagentaPoints
-    ? resolveMagentaPointsPrice(sellingPrice, listPrice, visible.price)
+    ? resolveMagentaPointsPrice(offer, orderListPrice, orderUnitPrice)
     : 0
   const itemPrice = isMagentaPoints
     ? 0
