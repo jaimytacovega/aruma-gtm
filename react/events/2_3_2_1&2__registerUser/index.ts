@@ -21,6 +21,24 @@ const REGISTER_SUCCESS_PAGE_TITLE = 'Aruma - Cuenta - Cuenta exitosa'
 const REGISTER_SUCCESS_PAGE_PATH = '/cuenta/cuenta-exitosa'
 const REGISTER_SUCCESS_TITLE_MARKER = 'Ya eres parte'
 const REGISTER_DISCOVER_MORE_CTA = '¡Descubre más!'
+const SESSION_POLL_MS = 500
+const SESSION_MAX_WAIT_MS = 15000
+
+type SessionField = { value?: string }
+
+type SessionResponse = {
+    namespaces?: {
+        profile?: {
+            isAuthenticated?: SessionField
+            email?: SessionField
+            document?: SessionField
+            firstName?: SessionField
+            lastName?: SessionField
+            id?: SessionField
+            phone?: SessionField
+        }
+    }
+}
 
 let registerFlowObserverAttached = false
 let registerDiscoverMoreCaptureAttached = false
@@ -165,6 +183,86 @@ const pushRegisterSuccessVirtualEvent = () => {
 
 const pushRegisterSuccessEvents = () => {
     pushRegisterSuccessVirtualPage()
+    pushRegisterSuccessVirtualEvent()
+}
+
+const readSessionField = (field?: SessionField): string | undefined => {
+    const value = field?.value?.trim()
+
+    return value || undefined
+}
+
+const fetchAuthenticatedUserData = async (): Promise<UserData | null> => {
+    try {
+        const response = await fetch('/api/sessions?items=*', {
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+            },
+        })
+
+        if (!response.ok) {
+            return null
+        }
+
+        const session = (await response.json()) as SessionResponse
+        const profile = session.namespaces?.profile
+        const isAuthenticated =
+            readSessionField(profile?.isAuthenticated) === 'true'
+
+        if (!isAuthenticated) {
+            return null
+        }
+
+        return {
+            event: 'pageInfo',
+            eventName: 'vtex:userData',
+            eventType: 'userData',
+            accountName: '',
+            pageTitle: document.title,
+            pageUrl: window.location.href,
+            currency: '',
+            isAuthenticated: true,
+            email: readSessionField(profile?.email),
+            document: readSessionField(profile?.document),
+            firstName: readSessionField(profile?.firstName),
+            lastName: readSessionField(profile?.lastName),
+            id: readSessionField(profile?.id),
+            phone: readSessionField(profile?.phone),
+        }
+    } catch {
+        return null
+    }
+}
+
+let pendingRegisterUserPropertiesSync = false
+
+const syncPendingRegisterUserProperties = async () => {
+    if (!hasAwaitingRegisterUserProperties() || pendingRegisterUserPropertiesSync) {
+        return
+    }
+
+    pendingRegisterUserPropertiesSync = true
+    const startedAt = Date.now()
+
+    try {
+        while (
+            hasAwaitingRegisterUserProperties() &&
+            Date.now() - startedAt < SESSION_MAX_WAIT_MS
+        ) {
+            const userData = await fetchAuthenticatedUserData()
+
+            if (userData && handleRegisterUserData(userData)) {
+                return
+            }
+
+            await new Promise((resolve) => {
+                window.setTimeout(resolve, SESSION_POLL_MS)
+            })
+        }
+    } finally {
+        pendingRegisterUserPropertiesSync = false
+    }
 }
 
 const pushRegisterUserProperties = (data: UserData) => {
@@ -206,6 +304,9 @@ const syncRegisterSuccess = () => {
     if (success && !registerSuccessWasVisible) {
         registerSuccessWasVisible = true
         pushRegisterSuccessEvents()
+        // Arm userProperties before dismiss/reload — user may close modal without
+        // clicking "¡Descubre más!" (sessionStorage survives same-tab reload).
+        setAwaitingRegisterUserProperties()
         return
     }
 
@@ -234,7 +335,7 @@ const setupRegisterDiscoverMoreCapture = () => {
                 return
             }
 
-            pushRegisterSuccessVirtualEvent()
+            // Refresh the awaiting window if they click the CTA after the modal appeared.
             setAwaitingRegisterUserProperties()
         },
         true
@@ -259,6 +360,7 @@ const registerUser = () => {
     }
 
     setupRegisterDiscoverMoreCapture()
+    void syncPendingRegisterUserProperties()
 
     if (registerFlowObserverAttached) {
         return
