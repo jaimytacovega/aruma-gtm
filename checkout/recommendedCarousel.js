@@ -11,6 +11,8 @@
   const ACTIVE_SLIDE_SCAN_DELAY_MS = 350
   const ADD_PENDING_TIMEOUT_MS = 8000
   const ADD_POLL_INTERVAL_MS = 250
+  const CHECKOUT_IMPRESSION_SESSION_KEY =
+    'aruma-gtm:checkout-recommended-impressions'
 
   const parsePrice = (value) => {
     const cleaned = String(value ?? '')
@@ -313,22 +315,75 @@
     const pendingByList = new Map()
     let batchFlushTimer = null
     let flushInProgress = false
-    let impressionPageKey = ''
 
     let pendingAdd = null
     let addInFlight = false
 
-    const getPageKey = () => global.location.href
+    const getDedupeKey = (visible) => `${visible.listId}:${visible.slug}`
 
-    const resetImpressionState = () => {
+    const loadLoggedSlugs = () => {
+      try {
+        const raw = global.sessionStorage?.getItem(CHECKOUT_IMPRESSION_SESSION_KEY)
+
+        if (!raw) {
+          return
+        }
+
+        const keys = JSON.parse(raw)
+
+        if (!Array.isArray(keys)) {
+          return
+        }
+
+        for (const key of keys) {
+          if (typeof key === 'string' && key) {
+            loggedSlugs.add(key)
+          }
+        }
+      } catch {
+        // sessionStorage unavailable or corrupt
+      }
+    }
+
+    const persistLoggedSlugs = () => {
+      try {
+        global.sessionStorage?.setItem(
+          CHECKOUT_IMPRESSION_SESSION_KEY,
+          JSON.stringify([...loggedSlugs])
+        )
+      } catch {
+        // sessionStorage unavailable
+      }
+    }
+
+    const clearCheckoutImpressionSession = () => {
+      loggedSlugs.clear()
+
+      try {
+        global.sessionStorage?.removeItem(CHECKOUT_IMPRESSION_SESSION_KEY)
+      } catch {
+        // sessionStorage unavailable
+      }
+    }
+
+    const clearPendingImpressions = () => {
       if (batchFlushTimer) {
         global.clearTimeout(batchFlushTimer)
         batchFlushTimer = null
       }
 
       pendingByList.clear()
-      loggedSlugs.clear()
-      impressionPageKey = getPageKey()
+    }
+
+    const onCheckoutNavigation = () => {
+      clearPendingImpressions()
+
+      if (!isCheckoutPage()) {
+        clearCheckoutImpressionSession()
+        return
+      }
+
+      scanCarousel()
     }
 
     const saveListContext = (visible) => {
@@ -394,13 +449,14 @@
     }
 
     const queueImpression = (card, visible) => {
-      const dedupeKey = `${visible.listId}:${visible.slug}`
+      const dedupeKey = getDedupeKey(visible)
 
       if (loggedSlugs.has(dedupeKey)) {
         return
       }
 
       loggedSlugs.add(dedupeKey)
+      persistLoggedSlugs()
 
       const batch = pendingByList.get(visible.listId) ?? []
 
@@ -459,10 +515,6 @@
 
       if (!root) {
         return
-      }
-
-      if (getPageKey() !== impressionPageKey) {
-        resetImpressionState()
       }
 
       root
@@ -719,7 +771,7 @@
         return
       }
 
-      impressionPageKey = getPageKey()
+      loadLoggedSlugs()
 
       domObserver = new MutationObserver(() => {
         scanCarousel()
@@ -731,7 +783,7 @@
       })
 
       global.document.addEventListener('click', onDocumentClick, true)
-      global.addEventListener('hashchange', resetImpressionState)
+      global.addEventListener('hashchange', onCheckoutNavigation)
 
       if (global.jQuery) {
         global.jQuery(global).on('orderFormUpdated.vtex', onOrderFormUpdated)
