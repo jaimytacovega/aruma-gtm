@@ -4,7 +4,9 @@
  */
 ;((global) => {
   const STORAGE_KEY = 'aruma-gtm:checkout-list-context'
+  const PENDING_NAV_LIST_CONTEXT_KEY = 'aruma-gtm:pending-product-list-context'
   const MAX_PRODUCT_ENTRIES = 50
+  const PENDING_NAV_MAX_AGE_MS = 5 * 60 * 1000
   const PERSIST_EVENTS = new Set([
     'select_item',
     'view_item_list',
@@ -39,6 +41,22 @@
   }
 
   const GENERIC_LIST_LABELS = new Set(['listing', 'list of products'])
+
+  const isUnavailableListContext = (list) => {
+    if (!list) {
+      return true
+    }
+
+    const listId = String(list.listId || '').trim().toLowerCase()
+    const listName = String(list.listName || '').trim().toLowerCase()
+
+    return (
+      !listId ||
+      !listName ||
+      listId === '(not available)' ||
+      listName === '(not available)'
+    )
+  }
 
   const isGenericListContext = (list) => {
     if (!list) {
@@ -129,7 +147,7 @@
   const saveListContextForKeys = (keys, list) => {
     const normalized = normalizeListContext(list)
 
-    if (!normalized) {
+    if (!normalized || isUnavailableListContext(normalized)) {
       return
     }
 
@@ -182,7 +200,7 @@
       const items = payload.ecommerce?.items
 
       if (!Array.isArray(items) || !items.length) {
-        if (ecommerceList) {
+        if (ecommerceList && !isUnavailableListContext(ecommerceList)) {
           const store = readStore()
           store.last = normalizeListContext(ecommerceList)
           writeStore(store)
@@ -194,11 +212,53 @@
       for (const raw of items) {
         const itemList = readListFromItem(raw) || ecommerceList
 
-        if (!itemList) {
+        if (!itemList || isUnavailableListContext(itemList)) {
           continue
         }
 
-        saveListContextForKeys([raw.item_id], itemList)
+        saveListContextForKeys([raw.item_id, raw.slug].filter(Boolean), itemList)
+      }
+    }
+
+    const productKeysMatch = (leftSlug, leftProductId, rightSlug, rightProductId) => {
+      const slugKey = leftSlug ? normalizeProductKey(leftSlug) : ''
+      const productIdKey = leftProductId
+        ? normalizeProductKey(String(leftProductId))
+        : ''
+      const pendingSlugKey = rightSlug ? normalizeProductKey(rightSlug) : ''
+      const pendingProductIdKey = rightProductId
+        ? normalizeProductKey(String(rightProductId))
+        : ''
+
+      return (
+        (slugKey && pendingSlugKey && slugKey === pendingSlugKey) ||
+        (productIdKey &&
+          pendingProductIdKey &&
+          productIdKey === pendingProductIdKey)
+      )
+    }
+
+    const savePendingNavigationListContext = ({
+      slug,
+      productId,
+      listId,
+      listName,
+    }) => {
+      saveListContextForProduct({ slug, productId, listId, listName })
+
+      try {
+        global.sessionStorage?.setItem(
+          PENDING_NAV_LIST_CONTEXT_KEY,
+          JSON.stringify({
+            slug,
+            productId,
+            listId,
+            listName,
+            savedAt: Date.now(),
+          })
+        )
+      } catch {
+        // sessionStorage unavailable
       }
     }
 
@@ -212,7 +272,7 @@
       if (slugKey && store.byProduct?.[slugKey]) {
         const normalized = normalizeListContext(store.byProduct[slugKey])
 
-        if (normalized && !isGenericListContext(normalized)) {
+        if (normalized && !isGenericListContext(normalized) && !isUnavailableListContext(normalized)) {
           return normalized
         }
       }
@@ -220,21 +280,17 @@
       if (productIdKey && store.byProduct?.[productIdKey]) {
         const normalized = normalizeListContext(store.byProduct[productIdKey])
 
-        if (normalized && !isGenericListContext(normalized)) {
+        if (normalized && !isGenericListContext(normalized) && !isUnavailableListContext(normalized)) {
           return normalized
         }
       }
 
-      if (slugKey && store.byProduct?.[slugKey]) {
-        return normalizeListContext(store.byProduct[slugKey]) ?? fallback
-      }
-
-      if (productIdKey && store.byProduct?.[productIdKey]) {
-        return normalizeListContext(store.byProduct[productIdKey]) ?? fallback
-      }
-
       if (store.last) {
-        return normalizeListContext(store.last) ?? fallback
+        const normalized = normalizeListContext(store.last)
+
+        if (normalized && !isUnavailableListContext(normalized)) {
+          return normalized
+        }
       }
 
       return fallback
@@ -243,6 +299,7 @@
     const clearListContextStore = () => {
       try {
         global.localStorage?.removeItem(STORAGE_KEY)
+        global.sessionStorage?.removeItem(PENDING_NAV_LIST_CONTEXT_KEY)
       } catch {
         // localStorage unavailable
       }
@@ -250,8 +307,10 @@
 
     return {
       STORAGE_KEY,
+      PENDING_NAV_LIST_CONTEXT_KEY,
       persistListContextFromPayload,
       saveListContextForProduct,
+      savePendingNavigationListContext,
       getListContextForProduct,
       clearListContextStore,
     }

@@ -4,7 +4,9 @@
  */
 
 export const LIST_CONTEXT_STORAGE_KEY = 'aruma-gtm:checkout-list-context'
+export const PENDING_NAV_LIST_CONTEXT_KEY = 'aruma-gtm:pending-product-list-context'
 const MAX_PRODUCT_ENTRIES = 50
+const PENDING_NAV_MAX_AGE_MS = 5 * 60 * 1000
 
 const PERSIST_EVENTS = new Set([
     'select_item',
@@ -23,6 +25,24 @@ export type ProductListContext = {
 }
 
 const GENERIC_LIST_LABELS = new Set(['listing', 'list of products'])
+
+export const isUnavailableListContext = (
+    list: ProductListContext | null | undefined
+): boolean => {
+    if (!list) {
+        return true
+    }
+
+    const listId = list.listId.trim().toLowerCase()
+    const listName = list.listName.trim().toLowerCase()
+
+    return (
+        !listId ||
+        !listName ||
+        listId === '(not available)' ||
+        listName === '(not available)'
+    )
+}
 
 export const isGenericListContext = (
     list: ProductListContext | null | undefined
@@ -163,7 +183,7 @@ const saveListContextForKeys = (
 ) => {
     const normalized = normalizeListContext(list)
 
-    if (!normalized) {
+    if (!normalized || isUnavailableListContext(normalized)) {
         return
     }
 
@@ -224,7 +244,7 @@ export const persistListContextFromPayload = (
         ?.items
 
     if (!Array.isArray(items) || !items.length) {
-        if (ecommerceList) {
+        if (ecommerceList && !isUnavailableListContext(ecommerceList)) {
             const store = readStore()
             store.last = normalizeListContext(ecommerceList)
             writeStore(store)
@@ -241,11 +261,14 @@ export const persistListContextFromPayload = (
         const item = raw as Record<string, unknown>
         const itemList = readListFromItem(item) || ecommerceList
 
-        if (!itemList) {
+        if (!itemList || isUnavailableListContext(itemList)) {
             continue
         }
 
-        saveListContextForKeys([String(item.item_id ?? '')], itemList)
+        saveListContextForKeys(
+            [String(item.item_id ?? ''), String(item.slug ?? '')],
+            itemList
+        )
     }
 }
 
@@ -277,7 +300,9 @@ export const getListContextFromStore = (
         }
     }
 
-    const specific = candidates.filter((entry) => !isGenericListContext(entry))
+    const specific = candidates.filter(
+        (entry) => !isGenericListContext(entry) && !isUnavailableListContext(entry)
+    )
 
     if (specific.length) {
         return specific[0]
@@ -294,6 +319,110 @@ export const getListContextFromStore = (
     return fallback
 }
 
+type PendingNavListContext = ProductListContext & {
+    slug?: string
+    productId?: string
+    savedAt: number
+}
+
+const productKeysMatch = (
+    leftSlug: string,
+    leftProductId: string,
+    rightSlug?: string,
+    rightProductId?: string
+): boolean => {
+    const slugKey = leftSlug ? normalizeProductKey(leftSlug) : ''
+    const productIdKey = leftProductId
+        ? normalizeProductKey(String(leftProductId))
+        : ''
+    const pendingSlugKey = rightSlug ? normalizeProductKey(rightSlug) : ''
+    const pendingProductIdKey = rightProductId
+        ? normalizeProductKey(String(rightProductId))
+        : ''
+
+    return Boolean(
+        (slugKey && pendingSlugKey && slugKey === pendingSlugKey) ||
+            (productIdKey &&
+                pendingProductIdKey &&
+                productIdKey === pendingProductIdKey)
+    )
+}
+
+export const savePendingNavigationListContext = ({
+    slug,
+    productId,
+    listId,
+    listName,
+}: {
+    slug?: string
+    productId?: string
+    listId: string
+    listName: string
+}) => {
+    saveListContextForProduct({ slug, productId, listId, listName })
+
+    if (typeof window === 'undefined') {
+        return
+    }
+
+    try {
+        const payload: PendingNavListContext = {
+            slug,
+            productId,
+            listId,
+            listName,
+            savedAt: Date.now(),
+        }
+
+        window.sessionStorage.setItem(
+            PENDING_NAV_LIST_CONTEXT_KEY,
+            JSON.stringify(payload)
+        )
+    } catch {
+        // sessionStorage unavailable
+    }
+}
+
+export const getPendingNavigationListContext = (
+    slug: string,
+    productId: string | undefined,
+    fallback: ProductListContext
+): ProductListContext => {
+    if (typeof window === 'undefined') {
+        return fallback
+    }
+
+    try {
+        const raw = window.sessionStorage.getItem(PENDING_NAV_LIST_CONTEXT_KEY)
+
+        if (!raw) {
+            return fallback
+        }
+
+        const pending = JSON.parse(raw) as PendingNavListContext
+        const age = Date.now() - Number(pending.savedAt ?? 0)
+
+        if (!Number.isFinite(age) || age > PENDING_NAV_MAX_AGE_MS) {
+            window.sessionStorage.removeItem(PENDING_NAV_LIST_CONTEXT_KEY)
+            return fallback
+        }
+
+        if (!productKeysMatch(slug, productId ?? '', pending.slug, pending.productId)) {
+            return fallback
+        }
+
+        const normalized = normalizeListContext(pending)
+
+        if (!normalized || isUnavailableListContext(normalized)) {
+            return fallback
+        }
+
+        return normalized
+    } catch {
+        return fallback
+    }
+}
+
 export const clearListContextStore = () => {
     if (typeof window === 'undefined') {
         return
@@ -301,6 +430,7 @@ export const clearListContextStore = () => {
 
     try {
         window.localStorage.removeItem(LIST_CONTEXT_STORAGE_KEY)
+        window.sessionStorage.removeItem(PENDING_NAV_LIST_CONTEXT_KEY)
     } catch {
         // localStorage unavailable
     }

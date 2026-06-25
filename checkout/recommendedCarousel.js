@@ -386,13 +386,55 @@
       scanCarousel()
     }
 
-    const saveListContext = (visible) => {
+    const persistCarouselListContext = (visible, productIdOverride) => {
+      const productId = productIdOverride || visible.productId
+
       listContextStore.saveListContextForProduct({
         slug: visible.slug,
-        productId: visible.productId,
+        productId,
         listId: visible.listId,
         listName: visible.listName,
       })
+    }
+
+    const saveNavigationListContext = (visible, productIdOverride) => {
+      const productId = productIdOverride || visible.productId
+
+      if (typeof listContextStore.savePendingNavigationListContext === 'function') {
+        listContextStore.savePendingNavigationListContext({
+          slug: visible.slug,
+          productId,
+          listId: visible.listId,
+          listName: visible.listName,
+        })
+        return
+      }
+
+      persistCarouselListContext(visible, productId)
+    }
+
+    const captureCarouselProductContext = (target) => {
+      if (!(target instanceof Element)) {
+        return
+      }
+
+      const card = target.closest(CARD_SELECTOR)
+
+      if (!(card instanceof HTMLElement) || !isInteractiveCard(card)) {
+        return
+      }
+
+      const visible = buildVisibleProduct(
+        card,
+        normalizeText,
+        getSlugFromDetailUrl
+      )
+
+      if (!visible) {
+        return
+      }
+
+      saveNavigationListContext(visible)
     }
 
     const enrichVisibleProduct = async (visible) => {
@@ -413,27 +455,59 @@
       }
 
       flushInProgress = true
+      const batches = new Map(pendingByList)
+
+      pendingByList.clear()
 
       try {
-        for (const [listId, entries] of pendingByList.entries()) {
-          const visibleProducts = entries
-            .filter((entry) => entry.el.isConnected)
-            .map((entry) => entry.visible)
+        for (const [listId, entries] of batches.entries()) {
+          const visibleProducts = entries.map((entry) => entry.visible)
 
           if (!visibleProducts.length) {
             continue
           }
 
-          const items = await Promise.all(
-            visibleProducts.map((visible) => enrichVisibleProduct(visible))
-          )
+          let items = []
+
+          try {
+            items = await Promise.all(
+              visibleProducts.map((visible) => enrichVisibleProduct(visible))
+            )
+          } catch {
+            continue
+          }
+
+          if (!items.length) {
+            continue
+          }
+
           const listName = visibleProducts[0].listName
 
           pushToDataLayer(buildViewItemListPayload(items, listId, listName))
+
+          items.forEach((item, index) => {
+            const visible = visibleProducts[index]
+
+            if (!visible || !item) {
+              return
+            }
+
+            try {
+              persistCarouselListContext(
+                visible,
+                String(item.item_id ?? visible.productId)
+              )
+            } catch {
+              // list context persistence must not block impressions
+            }
+          })
         }
       } finally {
-        pendingByList.clear()
         flushInProgress = false
+
+        if (pendingByList.size) {
+          scheduleBatchFlush()
+        }
       }
     }
 
@@ -600,9 +674,11 @@
         return
       }
 
-      saveListContext(visible)
+      saveNavigationListContext(visible)
 
       const item = await enrichVisibleProduct(visible)
+
+      persistCarouselListContext(visible, String(item.item_id ?? visible.productId))
 
       pushToDataLayer(buildSelectItemPayload(item))
     }
@@ -703,7 +779,7 @@
         return
       }
 
-      saveListContext(visible)
+      saveNavigationListContext(visible)
 
       const checkout = global.vtexjs?.checkout
 
@@ -731,6 +807,8 @@
       if (!(event.target instanceof Element)) {
         return
       }
+
+      captureCarouselProductContext(event.target)
 
       const addButton = getAddButtonFromTarget(event.target)
 
@@ -766,6 +844,24 @@
       void runRecommendedAddToCart(orderForm)
     }
 
+    const onDocumentMouseDown = (event) => {
+      if (!isCheckoutPage()) {
+        return
+      }
+
+      if (!(event.target instanceof Element)) {
+        return
+      }
+
+      const link = event.target.closest(`${ROOT_SELECTOR} a[href*="/p"]`)
+
+      if (!link) {
+        return
+      }
+
+      captureCarouselProductContext(event.target)
+    }
+
     const attach = () => {
       if (attached || typeof global.document === 'undefined') {
         return
@@ -783,6 +879,7 @@
       })
 
       global.document.addEventListener('click', onDocumentClick, true)
+      global.document.addEventListener('mousedown', onDocumentMouseDown, true)
       global.addEventListener('hashchange', onCheckoutNavigation)
 
       if (global.jQuery) {

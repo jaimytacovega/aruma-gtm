@@ -2,7 +2,9 @@ import { canUseDOM } from 'vtex.render-runtime'
 
 import {
     getListContextFromStore,
+    getPendingNavigationListContext,
     isGenericListContext,
+    isUnavailableListContext,
     persistListContextFromPayload,
 } from './listContextStore'
 import type { ProductListContext } from './listContextStore'
@@ -60,7 +62,11 @@ const selectItemMatchesProduct = (
     return false
 }
 
-const LIST_CONTEXT_EVENTS = new Set(['select_item', 'view_item_list'])
+const LIST_CONTEXT_EVENTS = new Set([
+    'select_item',
+    'view_item_list',
+    'add_to_cart',
+])
 
 const readListContextFromEcommerce = (
     entry: Record<string, unknown>
@@ -89,7 +95,7 @@ const listEventMatchesProduct = (
     slug: string,
     productId?: string
 ): boolean => {
-    if (entry.event === 'select_item') {
+    if (entry.event === 'select_item' || entry.event === 'add_to_cart') {
         return selectItemMatchesProduct(entry, slug, productId)
     }
 
@@ -131,7 +137,7 @@ const listContextScore = (
 ): number => {
     let score = 0
 
-    if (eventName === 'select_item') {
+    if (eventName === 'select_item' || eventName === 'add_to_cart') {
         score += 2
     }
 
@@ -189,21 +195,38 @@ const getListFromLastSelectItem = (
         }
     }
 
-    if (bestProductMatch) {
+    if (bestProductMatch && !isUnavailableListContext(bestProductMatch)) {
         return bestProductMatch
     }
 
-    if (lastListContext && !isGenericListContext(lastListContext)) {
-        return lastListContext
+    const fromPendingNav = getPendingNavigationListContext(
+        slug,
+        productId,
+        fallback
+    )
+
+    if (!isUnavailableListContext(fromPendingNav)) {
+        return fromPendingNav
     }
 
     const fromStore = getListContextFromStore(slug, productId, fallback)
 
-    if (!isGenericListContext(fromStore) && fromStore.listId !== NOT_AVAILABLE) {
+    if (
+        !isGenericListContext(fromStore) &&
+        !isUnavailableListContext(fromStore)
+    ) {
         return fromStore
     }
 
-    if (lastListContext) {
+    if (
+        lastListContext &&
+        !isGenericListContext(lastListContext) &&
+        !isUnavailableListContext(lastListContext)
+    ) {
+        return lastListContext
+    }
+
+    if (lastListContext && !isUnavailableListContext(lastListContext)) {
         return lastListContext
     }
 
