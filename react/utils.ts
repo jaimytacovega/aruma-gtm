@@ -66,6 +66,7 @@ const LIST_CONTEXT_EVENTS = new Set([
     'select_item',
     'view_item_list',
     'add_to_cart',
+    'view_item',
 ])
 
 const readListContextFromEcommerce = (
@@ -95,7 +96,11 @@ const listEventMatchesProduct = (
     slug: string,
     productId?: string
 ): boolean => {
-    if (entry.event === 'select_item' || entry.event === 'add_to_cart') {
+    if (
+        entry.event === 'select_item' ||
+        entry.event === 'add_to_cart' ||
+        entry.event === 'view_item'
+    ) {
         return selectItemMatchesProduct(entry, slug, productId)
     }
 
@@ -137,7 +142,11 @@ const listContextScore = (
 ): number => {
     let score = 0
 
-    if (eventName === 'select_item' || eventName === 'add_to_cart') {
+    if (
+        eventName === 'select_item' ||
+        eventName === 'add_to_cart' ||
+        eventName === 'view_item'
+    ) {
         score += 2
     }
 

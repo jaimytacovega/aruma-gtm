@@ -56,7 +56,11 @@ export const isGenericListContext = (
 
     return (
         GENERIC_LIST_LABELS.has(listId) ||
-        GENERIC_LIST_LABELS.has(listName)
+        GENERIC_LIST_LABELS.has(listName) ||
+        listId.startsWith('shelf--') ||
+        listName.startsWith('shelf--') ||
+        /^shelf[a-z]/i.test(listId) ||
+        /^shelf[a-z]/i.test(listName)
     )
 }
 

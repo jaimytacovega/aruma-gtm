@@ -80,6 +80,32 @@ export const enrichCartItems = async (
     })
   )
 
+const resolveMagentaPointsListContext = async (
+  cartItem: VtexCartItem
+): Promise<{ listId: string; listName: string } | null> => {
+  const catalogSlug = getSlugFromDetailUrl(cartItem.detailUrl)
+  const categories = cartItem.category ? [cartItem.category] : undefined
+
+  if (!catalogSlug) {
+    return null
+  }
+
+  try {
+    const catalog = await fetchCatalogProduct(catalogSlug)
+
+    if (isMagentaPointsProduct(catalog, categories)) {
+      return {
+        listId: MAGENTA_POINTS_LIST_LABEL,
+        listName: MAGENTA_POINTS_LIST_LABEL,
+      }
+    }
+  } catch (error) {
+    log('resolve list context catalog error', error)
+  }
+
+  return null
+}
+
 const resolveListContextForCartItem = async (
   cartItem: VtexCartItem
 ): Promise<{ listId: string; listName: string }> => {
@@ -93,38 +119,26 @@ const resolveListContextForCartItem = async (
     return fromPurchaseContext
   }
 
-  const fromDom = resolveProductListFromDom(slug)
-
-  if (fromDom && !isGenericListContext(fromDom)) {
-    return fromDom
-  }
-
   const fromHistory = getListFromLastSelectItem(slug, cartItem.productId)
 
   if (!isGenericListContext(fromHistory) && fromHistory.listId !== NOT_AVAILABLE) {
     return fromHistory
   }
 
-  if (fromDom) {
+  const fromMagentaPoints = await resolveMagentaPointsListContext(cartItem)
+
+  if (fromMagentaPoints) {
+    return fromMagentaPoints
+  }
+
+  const fromDom = resolveProductListFromDom(slug)
+
+  if (fromDom && !isGenericListContext(fromDom)) {
     return fromDom
   }
 
-  const catalogSlug = getSlugFromDetailUrl(cartItem.detailUrl)
-  const categories = cartItem.category ? [cartItem.category] : undefined
-
-  if (catalogSlug) {
-    try {
-      const catalog = await fetchCatalogProduct(catalogSlug)
-
-      if (isMagentaPointsProduct(catalog, categories)) {
-        return {
-          listId: MAGENTA_POINTS_LIST_LABEL,
-          listName: MAGENTA_POINTS_LIST_LABEL,
-        }
-      }
-    } catch (error) {
-      log('resolve list context catalog error', error)
-    }
+  if (fromDom) {
+    return fromDom
   }
 
   return fromHistory
