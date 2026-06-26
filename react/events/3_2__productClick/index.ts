@@ -1,5 +1,8 @@
 import { pushToDataLayer, log } from '../../utils'
-import { saveListContextForProduct } from '../../listContextStore'
+import {
+  saveListContextForProduct,
+  savePendingNavigationListContext,
+} from '../../listContextStore'
 import type { ProductClickData, ProductSummary } from '../../typings/events'
 
 import {
@@ -25,7 +28,24 @@ const getPriceFromProduct = (product: ProductSummary): number =>
 let searchAutocompleteClickAttached = false
 let goPersonalClickAttached = false
 
-const fireSelectItemFromVisible = async (visible: VisibleProduct): Promise<void> => {
+const persistProductListContext = (visible: VisibleProduct, productId?: string) => {
+  const context = {
+    slug: visible.slug,
+    productId: productId || undefined,
+    listId: visible.listId,
+    listName: visible.listName,
+  }
+
+  saveListContextForProduct(context)
+  savePendingNavigationListContext(context)
+}
+
+const fireSelectItemFromVisible = async (
+  visible: VisibleProduct,
+  productId?: string
+): Promise<void> => {
+  persistProductListContext(visible, productId)
+
   let catalog = null
 
   try {
@@ -35,6 +55,9 @@ const fireSelectItemFromVisible = async (visible: VisibleProduct): Promise<void>
   }
 
   const item = buildViewItem(visible, catalog)
+
+  persistProductListContext(visible, String(item.item_id ?? productId ?? ''))
+
   const payload = buildSelectItemPayload(item)
 
   pushToDataLayer(payload)
@@ -114,23 +137,20 @@ const productClick = async (data: ProductClickData) => {
   const domList = resolveProductListFromDom(slug)
   const listId = domList?.listId ?? data.list ?? 'listing'
   const listName = domList?.listName ?? data.list ?? 'List of products'
+  const productId = String(data.product.productId ?? '')
 
-  saveListContextForProduct({
-    slug,
-    productId: String(data.product.productId ?? ''),
-    listId,
-    listName,
-  })
-
-  await fireSelectItemFromVisible({
-    slug,
-    name: data.product.productName || slug,
-    brand: data.product.brand || '',
-    price: getPriceFromProduct(data.product),
-    index: domList?.index ?? data.position ?? 0,
-    listId,
-    listName,
-  })
+  await fireSelectItemFromVisible(
+    {
+      slug,
+      name: data.product.productName || slug,
+      brand: data.product.brand || '',
+      price: getPriceFromProduct(data.product),
+      index: domList?.index ?? data.position ?? 0,
+      listId,
+      listName,
+    },
+    productId
+  )
 }
 
 export { productClick }

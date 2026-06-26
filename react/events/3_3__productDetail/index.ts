@@ -1,10 +1,9 @@
-import { log, NOT_AVAILABLE, pushToDataLayer } from '../../utils'
+import { getListFromLastSelectItem, log, NOT_AVAILABLE, pushToDataLayer } from '../../utils'
 import type { ProductViewData } from '../../typings/events'
 import {
-    getListContextFromStore,
-    getPendingNavigationListContext,
     isGenericListContext,
     isUnavailableListContext,
+    savePendingNavigationListContext,
 } from '../../listContextStore'
 
 import {
@@ -54,23 +53,14 @@ const resolveProductListContext = (
         listName: NOT_AVAILABLE,
     }
 
-    const fromPendingNav = getPendingNavigationListContext(
-        slug,
-        productId,
-        fallback
-    )
-
-    if (!isUnavailableListContext(fromPendingNav)) {
-        return fromPendingNav
-    }
-
-    const fromStore = getListContextFromStore(slug, productId, fallback)
+    const fromHistory = getListFromLastSelectItem(slug, productId)
 
     if (
-        !isGenericListContext(fromStore) &&
-        !isUnavailableListContext(fromStore)
+        !isUnavailableListContext(fromHistory) &&
+        fromHistory.listId !== NOT_AVAILABLE &&
+        !isGenericListContext(fromHistory)
     ) {
-        return fromStore
+        return fromHistory
     }
 
     if (isMagentaPoints) {
@@ -78,6 +68,10 @@ const resolveProductListContext = (
             listId: MAGENTA_POINTS_LIST_LABEL,
             listName: MAGENTA_POINTS_LIST_LABEL,
         }
+    }
+
+    if (!isUnavailableListContext(fromHistory)) {
+        return fromHistory
     }
 
     return fallback

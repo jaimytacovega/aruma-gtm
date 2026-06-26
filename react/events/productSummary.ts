@@ -1,6 +1,7 @@
 import {
   isGenericListContext,
   saveListContextForProduct,
+  savePendingNavigationListContext,
 } from '../listContextStore'
 
 import {
@@ -414,6 +415,15 @@ export const captureProductClickTarget = (target: Element): void => {
   }
 
   saveListContextForProduct({
+    slug: visible.slug,
+    productId: isGoPersonalProduct(card)
+      ? getGoPersonalProductId(card)
+      : undefined,
+    listId: visible.listId,
+    listName: visible.listName,
+  })
+
+  savePendingNavigationListContext({
     slug: visible.slug,
     productId: isGoPersonalProduct(card)
       ? getGoPersonalProductId(card)
