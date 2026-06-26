@@ -1,7 +1,7 @@
 {
   "vendor": "aruma",
   "name": "aruma-gtm",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "title": "Aruma GTM",
   "description": "Custom Google Tag Manager dataLayer events for the Aruma storefront",
   "builders": {
