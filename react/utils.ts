@@ -1,6 +1,7 @@
 import { canUseDOM } from 'vtex.render-runtime'
 
 import {
+    getCartItemListContext,
     getListContextFromStore,
     getPendingNavigationListContext,
     isGenericListContext,
@@ -62,6 +63,23 @@ const selectItemMatchesProduct = (
     return false
 }
 
+const itemMatchesProduct = (
+    item: Record<string, unknown>,
+    slug: string,
+    productId?: string
+): boolean => {
+    const slugKey = normalizeProductKey(slug)
+    const productIdKey = productId
+        ? normalizeProductKey(String(productId))
+        : ''
+    const itemId = normalizeProductKey(String(item.item_id ?? ''))
+
+    return (
+        itemId === slugKey ||
+        (productIdKey !== '' && itemId === productIdKey)
+    )
+}
+
 const LIST_CONTEXT_EVENTS = new Set([
     'select_item',
     'view_item_list',
@@ -89,6 +107,63 @@ const readListContextFromEcommerce = (
         listId: listId || listName,
         listName: listName || listId,
     }
+}
+
+const readListFromItem = (
+    item: Record<string, unknown>
+): ProductListContext | null => {
+    const listName = String(item.item_list_name ?? '').trim()
+    const listId = String(item.item_list_id ?? listName).trim()
+
+    if (!listName && !listId) {
+        return null
+    }
+
+    return {
+        listId: listId || listName,
+        listName: listName || listId,
+    }
+}
+
+const readListContextForProductFromEntry = (
+    entry: Record<string, unknown>,
+    slug: string,
+    productId?: string
+): ProductListContext | null => {
+    if (!listEventMatchesProduct(entry, slug, productId)) {
+        return null
+    }
+
+    const ecommerce = entry.ecommerce as Record<string, unknown> | undefined
+    const items = ecommerce?.items
+
+    if (Array.isArray(items)) {
+        for (const raw of items) {
+            if (!raw || typeof raw !== 'object') {
+                continue
+            }
+
+            const item = raw as Record<string, unknown>
+
+            if (!itemMatchesProduct(item, slug, productId)) {
+                continue
+            }
+
+            const fromItem = readListFromItem(item)
+
+            if (fromItem && !isUnavailableListContext(fromItem)) {
+                return fromItem
+            }
+        }
+    }
+
+    const ecommerceList = readListContextFromEcommerce(entry)
+
+    if (ecommerceList && !isUnavailableListContext(ecommerceList)) {
+        return ecommerceList
+    }
+
+    return null
 }
 
 const listEventMatchesProduct = (
@@ -171,7 +246,6 @@ const getListFromLastSelectItem = (
     }
 
     window.dataLayer = window.dataLayer || []
-    let lastListContext: ProductListContext | null = null
     let bestProductMatch: ProductListContext | null = null
     let bestProductScore = -1
 
@@ -182,25 +256,21 @@ const getListFromLastSelectItem = (
             continue
         }
 
-        const list = readListContextFromEcommerce(entry)
+        const productList = readListContextForProductFromEntry(
+            entry,
+            slug,
+            productId
+        )
 
-        if (!list) {
+        if (!productList) {
             continue
         }
 
-        if (!lastListContext) {
-            lastListContext = list
-        }
-
-        if (!listEventMatchesProduct(entry, slug, productId)) {
-            continue
-        }
-
-        const score = listContextScore(String(entry.event), list)
+        const score = listContextScore(String(entry.event), productList)
 
         if (score > bestProductScore) {
             bestProductScore = score
-            bestProductMatch = list
+            bestProductMatch = productList
         }
     }
 
@@ -218,25 +288,24 @@ const getListFromLastSelectItem = (
         return fromPendingNav
     }
 
-    const fromStore = getListContextFromStore(slug, productId, fallback)
+    const fromCartSession = getCartItemListContext(slug, productId, {
+        excludeMagentaPoints: true,
+    })
+
+    if (fromCartSession) {
+        return fromCartSession
+    }
+
+    const fromStore = getListContextFromStore(slug, productId, fallback, {
+        excludeMagentaPoints: true,
+        allowLastFallback: true,
+    })
 
     if (
         !isGenericListContext(fromStore) &&
         !isUnavailableListContext(fromStore)
     ) {
         return fromStore
-    }
-
-    if (
-        lastListContext &&
-        !isGenericListContext(lastListContext) &&
-        !isUnavailableListContext(lastListContext)
-    ) {
-        return lastListContext
-    }
-
-    if (lastListContext && !isUnavailableListContext(lastListContext)) {
-        return lastListContext
     }
 
     return fromStore

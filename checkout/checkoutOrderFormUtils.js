@@ -836,21 +836,83 @@
       return match?.[1] ?? ''
     }
 
+    const normalizeProductKey = (value) => {
+      try {
+        return decodeURIComponent(String(value)).trim().toLowerCase()
+      } catch {
+        return String(value).trim().toLowerCase()
+      }
+    }
+
     const listContextStore = global.createListContextStore(NOT_AVAILABLE)
 
-    const getListFromLastSelectItem = (slug, productId) =>
-      listContextStore.getListContextForProduct({ slug, productId })
+    const getListContextFromPurchaseContext = (productId, slug) => {
+      const items = readCheckoutPurchaseContext().items
+
+      if (!items?.length) {
+        return null
+      }
+
+      const keys = [productId, slug]
+        .filter(Boolean)
+        .map((key) => normalizeProductKey(String(key)))
+
+      for (const item of items) {
+        const itemKey = normalizeProductKey(String(item.item_id ?? ''))
+
+        if (!itemKey || !keys.includes(itemKey)) {
+          continue
+        }
+
+        const listId = String(item.item_list_id ?? '').trim()
+        const listName = String(item.item_list_name ?? listId).trim()
+
+        if (listId && listId !== NOT_AVAILABLE) {
+          return {
+            listId,
+            listName: listName || listId,
+          }
+        }
+      }
+
+      return null
+    }
 
     const getListContextForOrderItem = (orderItem) => {
       const slug =
         getSlugFromDetailUrl(orderItem?.detailUrl) ||
         String(orderItem?.productId ?? '')
+      const productId = orderItem?.productId
+      const fromPurchaseContext = getListContextFromPurchaseContext(
+        productId,
+        slug
+      )
 
-      return listContextStore.getListContextForProduct({
+      if (fromPurchaseContext) {
+        return fromPurchaseContext
+      }
+
+      return listContextStore.resolveListContextForProduct({
         slug,
-        productId: orderItem?.productId,
+        productId,
       })
     }
+
+    const persistListContextForOrderItem = (orderItem, listId, listName) => {
+      const slug =
+        getSlugFromDetailUrl(orderItem?.detailUrl) ||
+        String(orderItem?.productId ?? '')
+
+      listContextStore.saveListContextForProduct({
+        slug,
+        productId: orderItem?.productId,
+        listId,
+        listName,
+      })
+    }
+
+    const getListFromLastSelectItem = (slug, productId) =>
+      listContextStore.resolveListContextForProduct({ slug, productId })
 
     const clearCheckoutListContext = () => listContextStore.clearListContextStore()
 
@@ -1066,6 +1128,7 @@
       getSlugFromDetailUrl,
       getListFromLastSelectItem,
       getListContextForOrderItem,
+      persistListContextForOrderItem,
       clearCheckoutListContext,
     }
   }

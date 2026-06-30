@@ -106,6 +106,9 @@ const resolveMagentaPointsListContext = async (
   return null
 }
 
+const isMagentaPointsListContext = (listId: string): boolean =>
+  listId.trim().toLowerCase() === 'magenta points'
+
 const resolveListContextForCartItem = async (
   cartItem: VtexCartItem
 ): Promise<{ listId: string; listName: string }> => {
@@ -119,16 +122,20 @@ const resolveListContextForCartItem = async (
     return fromPurchaseContext
   }
 
-  const fromHistory = getListFromLastSelectItem(slug, cartItem.productId)
-
-  if (!isGenericListContext(fromHistory) && fromHistory.listId !== NOT_AVAILABLE) {
-    return fromHistory
-  }
-
   const fromMagentaPoints = await resolveMagentaPointsListContext(cartItem)
 
   if (fromMagentaPoints) {
     return fromMagentaPoints
+  }
+
+  const fromHistory = getListFromLastSelectItem(slug, cartItem.productId)
+
+  if (
+    !isMagentaPointsListContext(fromHistory.listId) &&
+    !isGenericListContext(fromHistory) &&
+    fromHistory.listId !== NOT_AVAILABLE
+  ) {
+    return fromHistory
   }
 
   const fromDom = resolveProductListFromDom(slug)

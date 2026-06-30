@@ -33,15 +33,46 @@
   }
 
   const MAGENTA_POINTS_CATEGORY = 'magenta points'
+  const MAGENTA_POINTS_LIST_LABEL = 'Magenta Points'
 
-  const isMagentaPointsProduct = (catalog) => {
+  const isMagentaPointsListContext = (listId) =>
+    String(listId ?? '')
+      .trim()
+      .toLowerCase() === MAGENTA_POINTS_CATEGORY
+
+  const categoriesIncludeMagentaPoints = (categories) =>
+    parseCategoryParts(categories).some(
+      (part) => part.trim().toLowerCase() === MAGENTA_POINTS_CATEGORY
+    )
+
+  const isMagentaPointsProduct = (catalog, categories) => {
+    if (categoriesIncludeMagentaPoints(categories)) {
+      return true
+    }
+
     if (!catalog) {
       return false
     }
 
-    return parseCategoryParts(catalog.categories).some(
-      (part) => part.trim().toLowerCase() === MAGENTA_POINTS_CATEGORY
-    )
+    return categoriesIncludeMagentaPoints(catalog.categories)
+  }
+
+  const getOrderItemCategories = (orderItem) => {
+    if (
+      Array.isArray(orderItem?.productCategories) &&
+      orderItem.productCategories.length
+    ) {
+      return orderItem.productCategories
+    }
+
+    if (orderItem?.productCategoryIds) {
+      return String(orderItem.productCategoryIds)
+        .split('/')
+        .filter(Boolean)
+        .map((category) => `/${category}/`)
+    }
+
+    return undefined
   }
 
   const readSpecification = (product, ...names) => {
@@ -270,24 +301,50 @@
     return listPrice > unitPrice ? listPrice : unitPrice
   }
 
-  const enrichOrderFormItems = async (orderItems, orderFormUtils) =>
-    Promise.all(
-      orderItems.map(async (orderItem, index) => {
-        const { listId, listName } =
-          orderFormUtils.getListContextForOrderItem(orderItem)
-        const catalogSlug = getSlugFromDetailUrl(orderItem.detailUrl)
-        const slug = catalogSlug || orderItem.productId
-        let catalog = null
+  const enrichOrderFormItems = async (orderItems, orderFormUtils) => {
+    const items = []
 
-        if (catalogSlug) {
-          try {
-            catalog = await fetchCatalogProduct(catalogSlug)
-          } catch {
-            catalog = null
-          }
+    for (let index = 0; index < orderItems.length; index += 1) {
+      const orderItem = orderItems[index]
+      const catalogSlug = getSlugFromDetailUrl(orderItem.detailUrl)
+      const slug = catalogSlug || orderItem.productId
+      const orderItemCategories = getOrderItemCategories(orderItem)
+      let catalog = null
+
+      if (catalogSlug) {
+        try {
+          catalog = await fetchCatalogProduct(catalogSlug)
+        } catch {
+          catalog = null
         }
+      }
 
-        return buildViewItem(
+      const isMagentaPoints = isMagentaPointsProduct(catalog, orderItemCategories)
+      let listId
+      let listName
+
+      if (isMagentaPoints) {
+        listId = MAGENTA_POINTS_LIST_LABEL
+        listName = MAGENTA_POINTS_LIST_LABEL
+      } else {
+        ;({ listId, listName } =
+          orderFormUtils.getListContextForOrderItem(orderItem))
+      }
+
+      if (
+        typeof orderFormUtils.persistListContextForOrderItem === 'function' &&
+        listId !== NOT_AVAILABLE &&
+        !(isMagentaPointsListContext(listId) && !isMagentaPoints)
+      ) {
+        orderFormUtils.persistListContextForOrderItem(
+          orderItem,
+          listId,
+          listName
+        )
+      }
+
+      items.push(
+        buildViewItem(
           {
             slug,
             name: orderItem.name,
@@ -301,8 +358,11 @@
           },
           catalog
         )
-      })
-    )
+      )
+    }
+
+    return items
+  }
 
   const getItemNetValue = (item) =>
     Number(((item.price - item.discount) * item.quantity).toFixed(2))
@@ -345,6 +405,7 @@
 
   global.createCheckoutCartItems = () => ({
     NOT_AVAILABLE,
+    MAGENTA_POINTS_LIST_LABEL,
     enrichOrderFormItems,
     buildViewItem,
     fetchCatalogProduct,

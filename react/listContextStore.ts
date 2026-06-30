@@ -5,7 +5,9 @@
 
 export const LIST_CONTEXT_STORAGE_KEY = 'aruma-gtm:checkout-list-context'
 export const PENDING_NAV_LIST_CONTEXT_KEY = 'aruma-gtm:pending-product-list-context'
+export const CART_ITEM_LIST_CONTEXT_KEY = 'aruma-gtm:cart-item-list-context'
 const MAX_PRODUCT_ENTRIES = 50
+const MAX_CART_ITEM_LIST_ENTRIES = 100
 const PENDING_NAV_MAX_AGE_MS = 5 * 60 * 1000
 
 const PERSIST_EVENTS = new Set([
@@ -25,6 +27,37 @@ export type ProductListContext = {
 }
 
 const GENERIC_LIST_LABELS = new Set(['listing', 'list of products'])
+const MAGENTA_POINTS_LIST_LABEL = 'magenta points'
+
+export const isMagentaPointsListContext = (
+    listId: string | undefined
+): boolean =>
+    String(listId ?? '')
+        .trim()
+        .toLowerCase() === MAGENTA_POINTS_LIST_LABEL
+
+type ListContextLookupOptions = {
+    excludeMagentaPoints?: boolean
+    allowLastFallback?: boolean
+}
+
+const isUsableListContext = (
+    list: ProductListContext | null | undefined,
+    options: ListContextLookupOptions = {}
+): boolean => {
+    if (!list || isUnavailableListContext(list)) {
+        return false
+    }
+
+    if (
+        options.excludeMagentaPoints &&
+        isMagentaPointsListContext(list.listId)
+    ) {
+        return false
+    }
+
+    return true
+}
 
 export const isUnavailableListContext = (
     list: ProductListContext | null | undefined
@@ -181,6 +214,116 @@ const readListFromEcommerce = (
     }
 }
 
+type CartItemListStore = Record<string, ProductListContext>
+
+const readCartItemListStore = (): CartItemListStore => {
+    if (typeof window === 'undefined') {
+        return {}
+    }
+
+    try {
+        const raw = window.sessionStorage.getItem(CART_ITEM_LIST_CONTEXT_KEY)
+
+        if (raw) {
+            return JSON.parse(raw) as CartItemListStore
+        }
+    } catch {
+        // sessionStorage unavailable or corrupt
+    }
+
+    return {}
+}
+
+const writeCartItemListStore = (store: CartItemListStore) => {
+    if (typeof window === 'undefined') {
+        return
+    }
+
+    try {
+        const keys = Object.keys(store)
+
+        if (keys.length > MAX_CART_ITEM_LIST_ENTRIES) {
+            const trimmed = keys.slice(-MAX_CART_ITEM_LIST_ENTRIES)
+            const next: CartItemListStore = {}
+
+            for (const key of trimmed) {
+                next[key] = store[key]
+            }
+
+            store = next
+        }
+
+        window.sessionStorage.setItem(
+            CART_ITEM_LIST_CONTEXT_KEY,
+            JSON.stringify(store)
+        )
+    } catch {
+        // sessionStorage unavailable
+    }
+}
+
+const saveCartItemListContext = ({
+    productId,
+    slug,
+    listId,
+    listName,
+}: {
+    productId?: string
+    slug?: string
+    listId: string
+    listName: string
+}) => {
+    const normalized = normalizeListContext({ listId, listName })
+
+    if (!normalized || isUnavailableListContext(normalized)) {
+        return
+    }
+
+    const store = readCartItemListStore()
+
+    for (const key of [productId, slug]) {
+        if (!key) {
+            continue
+        }
+
+        const productKey = normalizeProductKey(String(key))
+
+        if (!productKey) {
+            continue
+        }
+
+        store[productKey] = normalized
+    }
+
+    writeCartItemListStore(store)
+}
+
+export const getCartItemListContext = (
+    slug: string,
+    productId: string | undefined,
+    options: ListContextLookupOptions = {}
+): ProductListContext | null => {
+    const store = readCartItemListStore()
+    const slugKey = slug ? normalizeProductKey(slug) : ''
+    const productIdKey = productId
+        ? normalizeProductKey(String(productId))
+        : ''
+
+    for (const key of [slugKey, productIdKey]) {
+        if (!key || !store[key]) {
+            continue
+        }
+
+        const normalized = normalizeListContext(store[key])
+
+        if (isUsableListContext(normalized, options)) {
+            return normalized
+        }
+    }
+
+    return null
+}
+
 const saveListContextForKeys = (
     keys: Array<string | undefined | null>,
     list: ProductListContext
@@ -193,7 +336,9 @@ const saveListContextForKeys = (
 
     const store = readStore()
 
-    store.last = normalized
+    if (!isMagentaPointsListContext(normalized.listId)) {
+        store.last = normalized
+    }
 
     for (const key of keys) {
         if (!key) {
@@ -234,6 +379,7 @@ export const saveListContextForProduct = ({
     listName: string
 }) => {
     saveListContextForKeys([productId, slug], { listId, listName })
+    saveCartItemListContext({ productId, slug, listId, listName })
 }
 
 export const persistListContextFromPayload = (
@@ -250,7 +396,12 @@ export const persistListContextFromPayload = (
     if (!Array.isArray(items) || !items.length) {
         if (ecommerceList && !isUnavailableListContext(ecommerceList)) {
             const store = readStore()
-            store.last = normalizeListContext(ecommerceList)
+            const normalized = normalizeListContext(ecommerceList)
+
+            if (normalized && !isMagentaPointsListContext(normalized.listId)) {
+                store.last = normalized
+            }
+
             writeStore(store)
         }
 
@@ -279,7 +430,8 @@ export const persistListContextFromPayload = (
 export const getListContextFromStore = (
     slug: string,
     productId: string | undefined,
-    fallback: ProductListContext
+    fallback: ProductListContext,
+    options: ListContextLookupOptions = {}
 ): ProductListContext => {
     const store = readStore()
     const slugKey = slug ? normalizeProductKey(slug) : ''
@@ -291,16 +443,19 @@ export const getListContextFromStore = (
     if (slugKey && store.byProduct?.[slugKey]) {
         const normalized = normalizeListContext(store.byProduct[slugKey])
 
-        if (normalized) {
-            candidates.push(normalized)
+        if (isUsableListContext(normalized, options)) {
+            candidates.push(normalized!)
         }
     }
 
     if (productIdKey && store.byProduct?.[productIdKey]) {
         const normalized = normalizeListContext(store.byProduct[productIdKey])
 
-        if (normalized && !candidates.some((entry) => entry.listId === normalized.listId)) {
-            candidates.push(normalized)
+        if (
+            isUsableListContext(normalized, options) &&
+            !candidates.some((entry) => entry.listId === normalized!.listId)
+        ) {
+            candidates.push(normalized!)
         }
     }
 
@@ -316,8 +471,12 @@ export const getListContextFromStore = (
         return candidates[0]
     }
 
-    if (store.last) {
-        return normalizeListContext(store.last) ?? fallback
+    if (options.allowLastFallback && store.last) {
+        const normalized = normalizeListContext(store.last)
+
+        if (isUsableListContext(normalized, options)) {
+            return normalized!
+        }
     }
 
     return fallback
@@ -435,6 +594,7 @@ export const clearListContextStore = () => {
     try {
         window.localStorage.removeItem(LIST_CONTEXT_STORAGE_KEY)
         window.sessionStorage.removeItem(PENDING_NAV_LIST_CONTEXT_KEY)
+        window.sessionStorage.removeItem(CART_ITEM_LIST_CONTEXT_KEY)
     } catch {
         // localStorage unavailable
     }

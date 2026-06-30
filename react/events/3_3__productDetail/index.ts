@@ -53,6 +53,13 @@ const resolveProductListContext = (
         listName: NOT_AVAILABLE,
     }
 
+    if (isMagentaPoints) {
+        return {
+            listId: MAGENTA_POINTS_LIST_LABEL,
+            listName: MAGENTA_POINTS_LIST_LABEL,
+        }
+    }
+
     const fromHistory = getListFromLastSelectItem(slug, productId)
 
     if (
@@ -61,13 +68,6 @@ const resolveProductListContext = (
         !isGenericListContext(fromHistory)
     ) {
         return fromHistory
-    }
-
-    if (isMagentaPoints) {
-        return {
-            listId: MAGENTA_POINTS_LIST_LABEL,
-            listName: MAGENTA_POINTS_LIST_LABEL,
-        }
     }
 
     if (!isUnavailableListContext(fromHistory)) {
